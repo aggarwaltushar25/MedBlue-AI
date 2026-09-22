@@ -1,0 +1,6 @@
+{
+  "name": "MediShield AI",
+  "description": "Production-grade pharmacy verification overview, cold-chain monitoring, and supply-chain risk analytics command center.",
+  "requestFramePermissions": ["camera"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
