@@ -9,11 +9,13 @@ import { SupplyChainNotification, unifiedStore } from '../services/unifiedStore'
 
 interface SupplyChainNotificationCenterProps {
   recipientOrg: string;
+  recipientRole: 'Wholesaler' | 'Pharmacist' | 'Manufacturer' | 'Chemist' | 'Client' | 'Regulator' | 'Admin';
   onOpenShipment?: (shipmentId: string, route: string) => void;
 }
 
 export const SupplyChainNotificationCenter: React.FC<SupplyChainNotificationCenterProps> = ({
   recipientOrg,
+  recipientRole,
   onOpenShipment,
 }) => {
   const [isOpen, setIsOpen] = useState<boolean>(false);
@@ -28,11 +30,11 @@ export const SupplyChainNotificationCenter: React.FC<SupplyChainNotificationCent
   }, []);
 
   const notifications = useMemo(() => {
-    return unifiedStore.getSupplyChainNotifications(recipientOrg);
-  }, [recipientOrg, storeTick]);
+    return unifiedStore.getSupplyChainNotifications(recipientOrg, recipientRole);
+  }, [recipientOrg, recipientRole, storeTick]);
 
   const unreadCount = useMemo(() => {
-    return notifications.filter((n) => n.status === 'CREATED' || n.status === 'DELIVERED' || n.status === 'READ').length;
+    return notifications.filter((n) => n.status === 'CREATED' || n.status === 'DELIVERED').length;
   }, [notifications]);
 
   const filteredNotifications = useMemo(() => {
@@ -56,7 +58,7 @@ export const SupplyChainNotificationCenter: React.FC<SupplyChainNotificationCent
   };
 
   const handleMarkAllRead = () => {
-    unifiedStore.markAllNotificationsRead(recipientOrg);
+    unifiedStore.markAllNotificationsRead(recipientOrg, recipientRole);
   };
 
   return (

@@ -30,13 +30,14 @@ import { CameraScannerModal } from './CameraScannerModal';
 import { BlockchainModal } from './BlockchainModal';
 import { MedicineImageUploadModal } from './MedicineImageUploadModal';
 import { unifiedStore } from '../services/unifiedStore';
+import { blockchainService } from '../services/blockchain';
 
-interface CustomerModeViewProps {
+interface PatientModeViewProps {
   onSwitchToChemist: () => void;
   onViewForensics?: (batchNumber: string) => void;
 }
 
-export const CustomerModeView: React.FC<CustomerModeViewProps> = ({
+export const PatientModeView: React.FC<PatientModeViewProps> = ({
   onSwitchToChemist,
   onViewForensics,
 }) => {
@@ -59,7 +60,7 @@ export const CustomerModeView: React.FC<CustomerModeViewProps> = ({
           <div className="max-w-xl">
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-600/60 border border-blue-400/40 text-blue-100 text-xs font-semibold mb-3">
               <HeartHandshake className="w-4 h-4 text-emerald-300" />
-              <span>Patient Medicine Safety Assistant</span>
+              <span>STAGE 5 — CONSUMER PATIENT</span>
             </div>
             <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-white font-display">
               Is your medicine genuine and safe?
@@ -261,51 +262,61 @@ export const CustomerModeView: React.FC<CustomerModeViewProps> = ({
         </div>
 
         {/* Simplified Supply Chain Verification Flow */}
-        <div className="mt-5 p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-3">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
-              <ShieldCheck className="w-4 h-4 text-emerald-600" />
-              <span>Supply Chain Journey Verification</span>
-            </span>
-            <span className="text-[11px] text-emerald-700 font-bold bg-emerald-100 px-2 py-0.5 rounded-full">
-              Full Traceability Available
-            </span>
-          </div>
+        {(() => {
+          const blocks = blockchainService.getChain().filter(b => b.batchId === currentMedicine.batchNumber);
+          const hasMfg = blocks.some(b => b.eventType === 'DISPATCHED_BY_MANUFACTURER' || b.eventType === 'MANUFACTURED' || b.eventData?.stage === 1);
+          const hasWholesale = blocks.some(b => b.eventType === 'RECEIVED_BY_WHOLESALER' || b.eventData?.stage === 2);
+          const hasPharmacy = blocks.some(b => b.eventType === 'RECEIVED_BY_PHARMACIST' || b.eventData?.stage === 3);
+          const hasChemist = blocks.some(b => b.eventType === 'RECEIVED_BY_CHEMIST' || b.eventData?.stage === 4);
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 text-xs">
-            <div className="p-2.5 rounded-xl bg-white border border-slate-200 text-center space-y-1">
-              <span className="text-[10px] text-slate-500 font-semibold uppercase block">Manufactured</span>
-              <span className="font-bold text-emerald-600 flex items-center justify-center gap-1">
-                <CheckCircle2 className="w-3.5 h-3.5" />
-                <span>Verified ✓</span>
-              </span>
-            </div>
+          return (
+            <div className="mt-5 p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
+                  <ShieldCheck className="w-4 h-4 text-emerald-600" />
+                  <span>Supply Chain Journey Verification</span>
+                </span>
+                <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${blocks.length > 0 ? 'text-emerald-700 bg-emerald-100' : 'text-slate-500 bg-slate-100'}`}>
+                  {blocks.length > 0 ? 'On-Chain Traceability Verified' : 'Manual Registry Trace'}
+                </span>
+              </div>
 
-            <div className="p-2.5 rounded-xl bg-white border border-slate-200 text-center space-y-1">
-              <span className="text-[10px] text-slate-500 font-semibold uppercase block">Wholesaler Received</span>
-              <span className="font-bold text-emerald-600 flex items-center justify-center gap-1">
-                <CheckCircle2 className="w-3.5 h-3.5" />
-                <span>Verified ✓</span>
-              </span>
-            </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 text-xs">
+                <div className={`p-2.5 rounded-xl border text-center space-y-1 ${hasMfg ? 'bg-emerald-50 border-emerald-200' : 'bg-white border-slate-200'}`}>
+                  <span className="text-[10px] text-slate-500 font-semibold uppercase block">Manufactured</span>
+                  <span className={`font-bold flex items-center justify-center gap-1 ${hasMfg ? 'text-emerald-600' : 'text-slate-400'}`}>
+                    {hasMfg && <CheckCircle2 className="w-3.5 h-3.5" />}
+                    <span>{hasMfg ? 'Verified ✓' : 'Pending'}</span>
+                  </span>
+                </div>
 
-            <div className="p-2.5 rounded-xl bg-white border border-slate-200 text-center space-y-1">
-              <span className="text-[10px] text-slate-500 font-semibold uppercase block">Pharmacist Received</span>
-              <span className="font-bold text-emerald-600 flex items-center justify-center gap-1">
-                <CheckCircle2 className="w-3.5 h-3.5" />
-                <span>Verified ✓</span>
-              </span>
-            </div>
+                <div className={`p-2.5 rounded-xl border text-center space-y-1 ${hasWholesale ? 'bg-emerald-50 border-emerald-200' : 'bg-white border-slate-200'}`}>
+                  <span className="text-[10px] text-slate-500 font-semibold uppercase block">Wholesaler Depot</span>
+                  <span className={`font-bold flex items-center justify-center gap-1 ${hasWholesale ? 'text-emerald-600' : 'text-slate-400'}`}>
+                    {hasWholesale && <CheckCircle2 className="w-3.5 h-3.5" />}
+                    <span>{hasWholesale ? 'Verified ✓' : 'Pending'}</span>
+                  </span>
+                </div>
 
-            <div className="p-2.5 rounded-xl bg-white border border-slate-200 text-center space-y-1">
-              <span className="text-[10px] text-slate-500 font-semibold uppercase block">Verification</span>
-              <span className="font-bold text-emerald-600 flex items-center justify-center gap-1">
-                <CheckCircle2 className="w-3.5 h-3.5" />
-                <span>Available ✓</span>
-              </span>
+                <div className={`p-2.5 rounded-xl border text-center space-y-1 ${hasPharmacy ? 'bg-emerald-50 border-emerald-200' : 'bg-white border-slate-200'}`}>
+                  <span className="text-[10px] text-slate-500 font-semibold uppercase block">Pharmacy Dock</span>
+                  <span className={`font-bold flex items-center justify-center gap-1 ${hasPharmacy ? 'text-emerald-600' : 'text-slate-400'}`}>
+                    {hasPharmacy && <CheckCircle2 className="w-3.5 h-3.5" />}
+                    <span>{hasPharmacy ? 'Verified ✓' : 'Pending'}</span>
+                  </span>
+                </div>
+
+                <div className={`p-2.5 rounded-xl border text-center space-y-1 ${hasChemist ? 'bg-emerald-50 border-emerald-200' : 'bg-white border-slate-200'}`}>
+                  <span className="text-[10px] text-slate-500 font-semibold uppercase block">Chemist Verify</span>
+                  <span className={`font-bold flex items-center justify-center gap-1 ${hasChemist ? 'text-emerald-600' : 'text-slate-400'}`}>
+                    {hasChemist && <CheckCircle2 className="w-3.5 h-3.5" />}
+                    <span>{hasChemist ? 'Verified ✓' : 'Pending'}</span>
+                  </span>
+                </div>
+              </div>
             </div>
-          </div>
-        </div>
+          );
+        })()}
 
         {/* Consumer Hologram / Packaging Verification Card */}
         <div className="mt-5 p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-3">
@@ -446,7 +457,7 @@ export const CustomerModeView: React.FC<CustomerModeViewProps> = ({
         isOpen={isScannerOpen}
         onClose={() => setIsScannerOpen(false)}
         onScanComplete={(result) => setCurrentMedicine(result)}
-        mode="customer"
+        mode="patient"
         onViewForensics={onViewForensics}
       />
 
@@ -454,7 +465,7 @@ export const CustomerModeView: React.FC<CustomerModeViewProps> = ({
       <MedicineImageUploadModal
         isOpen={isImageUploadOpen}
         onClose={() => setIsImageUploadOpen(false)}
-        mode="customer"
+        mode="patient"
         onScanComplete={(result) => setCurrentMedicine(result)}
         onViewForensics={onViewForensics}
       />

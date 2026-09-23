@@ -689,11 +689,12 @@ class UnifiedStoreService {
     this.notify();
   }
 
-  public getSupplyChainNotifications(recipientOrg?: string): SupplyChainNotification[] {
-    if (!recipientOrg) return this.supplyChainNotifications;
-    return this.supplyChainNotifications.filter(
-      (n) => n.recipientOrg.toLowerCase().includes(recipientOrg.toLowerCase()) || recipientOrg.toLowerCase().includes(n.recipientOrg.toLowerCase())
+  public getSupplyChainNotifications(recipientOrg: string, recipientRole: string): SupplyChainNotification[] {
+    const notifications = this.supplyChainNotifications.filter(
+      (n) => n.recipientOrg.trim().toLowerCase() === recipientOrg.trim().toLowerCase() && n.recipientRole === recipientRole
     );
+    console.log('Fetching notifications for:', recipientOrg, recipientRole, 'Found:', notifications.length, 'Total:', this.supplyChainNotifications.length);
+    return notifications;
   }
 
   public markNotificationRead(notificationId: string): void {
@@ -706,10 +707,10 @@ class UnifiedStoreService {
     }
   }
 
-  public markAllNotificationsRead(recipientOrg?: string): void {
+  public markAllNotificationsRead(recipientOrg: string, recipientRole: string): void {
     const timestamp = new Date().toISOString().replace('T', ' ').slice(0, 19) + ' UTC';
     this.supplyChainNotifications.forEach((n) => {
-      if (!recipientOrg || n.recipientOrg.toLowerCase().includes(recipientOrg.toLowerCase())) {
+      if (n.recipientOrg.toLowerCase() === recipientOrg.toLowerCase() && n.recipientRole === recipientRole) {
         if (n.status === 'CREATED' || n.status === 'DELIVERED') {
           n.status = 'READ';
           n.readAt = timestamp;
@@ -1563,7 +1564,7 @@ class UnifiedStoreService {
       recipientOrg: data.wholesaler,
       recipientRole: 'Wholesaler',
       type: 'NEW_SHIPMENT',
-      title: 'New shipment dispatched to you',
+      title: '🔴 NEW SHIPMENT ALERT',
       message: `Consignment of ${data.quantity} units of ${data.medicineName} (Batch: ${data.batchNumber}) dispatched by ${data.manufacturer}. Required action: Receive & Verify.`,
       shipmentId,
       batchId: data.batchNumber,
@@ -1595,6 +1596,7 @@ class UnifiedStoreService {
         quantity: data.quantity,
         carrierName: data.carrierName,
         targetTemp: data.targetTemp,
+        stage: 1,
       },
     });
 
@@ -1654,6 +1656,7 @@ class UnifiedStoreService {
         depotLocation,
         recordedTemp,
         status: 'ACCEPTED_INTO_WHOLESALE_DEPOT',
+        stage: 2,
       },
     });
 
@@ -1752,10 +1755,10 @@ class UnifiedStoreService {
 
     this.supplyChainNotifications.unshift({
       notificationId: `NOTIF-${Math.floor(1000 + Math.random() * 9000)}`,
-      recipientOrg: data.pharmacistName,
+      recipientOrg: data.pharmacistName.trim(),
       recipientRole: 'Pharmacist',
       type: 'NEW_SHIPMENT',
-      title: 'New medicine shipment dispatched to your pharmacy',
+      title: '🔴 NEW SHIPMENT ALERT',
       message: `Consignment of ${requestedQty} units of ${parentShp.medicineName} (Batch: ${parentShp.batchNumber}) dispatched by ${data.wholesalerName}. Required action: Receive & Verify.`,
       shipmentId: childShipmentId,
       batchId: parentShp.batchNumber,
@@ -1788,10 +1791,12 @@ class UnifiedStoreService {
         destinationStore: data.destinationStore,
         dispatchedQuantity: requestedQty,
         parentRemainingQuantity: parentShp.quantity,
+        stage: 2,
       },
     });
 
     this.persist();
+    console.log('Dispatch successful, created notification for:', data.pharmacistName, 'Role:', 'Pharmacist');
     this.addNotification(
       'Child Shipment Dispatched to Pharmacist',
       `Child Shipment ${childShipmentId} (${requestedQty} units) en route to ${data.pharmacistName}. Parent remaining: ${parentShp.quantity} units.`,
@@ -1823,7 +1828,22 @@ class UnifiedStoreService {
 
     if (shp) {
       shp.verificationStatus = 'PASSED';
+      shp.status = 'Accepted';
       shp.currentLocation = `${pharmacistName} (${pharmacyLocation})`;
+      
+      // Update parent shipment if all children are accepted
+      if (shp.parentShipmentId) {
+        const parentShp = this.shipments.find((s) => s.id === shp.parentShipmentId);
+        if (parentShp) {
+          const childShipments = this.shipments.filter((s) => s.parentShipmentId === parentShp.id);
+          const allAccepted = childShipments.every((s) => s.status === 'Accepted');
+          if (allAccepted) {
+            parentShp.status = 'Accepted';
+            parentShp.currentLocation = 'Inventory Received at Pharmacy';
+          }
+        }
+      }
+
       shp.auditLogs = shp.auditLogs || [];
 
       const expectedQty = shp.quantity ?? 100;
@@ -1895,6 +1915,7 @@ class UnifiedStoreService {
         actualReceivedQuantity: typeof actualReceivedQty === 'number' ? actualReceivedQty : shp?.quantity || 0,
         discrepancyCount: actualReceivedQty !== undefined && shp ? Math.max(0, (shp.quantity || 0) - actualReceivedQty) : 0,
         status: 'VERIFIED_ACCEPTED',
+        stage: 3,
       },
     });
 
@@ -1953,7 +1974,218 @@ class UnifiedStoreService {
   }
 
   /**
-   * 7. PHARMACIST: Dispense / Sell Medicine to Patient
+   * 7. PHARMACIST: Dispatch Outgoing Shipment to Chemist Staff
+   */
+  public dispatchPharmacistToChemist(data: {
+    inventoryId: string;
+    pharmacistName: string;
+    chemistName: string;
+    destinationChemist: string;
+    quantity: number;
+  }) {
+    const timestamp = new Date().toISOString().replace('T', ' ').slice(0, 19) + ' UTC';
+    const item = this.inventory.find((i) => i.id === data.inventoryId);
+
+    if (!item) {
+      throw new Error(`Inventory item ${data.inventoryId} not found.`);
+    }
+
+    const currentQty = item.quantity;
+    const requestedQty = Number(data.quantity);
+    if (requestedQty > currentQty) {
+      this.addNotification(
+        'Dispatch Failed',
+        `Insufficient stock. Available: ${currentQty}`,
+        'error'
+      );
+      return null;
+    }
+
+    // Deduct from pharmacy inventory
+    item.quantity -= requestedQty;
+    item.lastVerified = timestamp.slice(0, 16);
+
+    // Create child shipment
+    const childShipmentId = `SHP-P2C-${Math.floor(100 + Math.random() * 900)}`;
+    const childShipment: ShipmentVerification = {
+      id: childShipmentId,
+      parentShipmentId: item.shipmentId,
+      batchNumber: item.batchNumber,
+      medicineName: item.medicineName,
+      category: item.category,
+      quantity: requestedQty,
+      supplier: 'Licensed Pharmacy',
+      verifiedAt: timestamp,
+      status: 'Accepted',
+      primaryIssue: 'None (Pharmacy Dispatch to Chemist)',
+      location: 'In Transit',
+      expiryDate: item.expiryDate,
+      riskScore: item.riskScore,
+      serialCount: requestedQty,
+      originLocation: 'Pharmacy Central Vault',
+      destinationLocation: `${data.chemistName} (${data.destinationChemist})`,
+      dispatchDate: timestamp.slice(0, 10),
+      estimatedArrival: timestamp.slice(0, 10),
+      verificationStatus: 'IN_TRANSIT',
+      overallRisk: item.riskLevel === 'High' ? 'High' : 'Low',
+      isFlagged: false,
+      coldChainCompliant: item.coldChainCompliant,
+      serialCheckPassed: true,
+      packagingScore: 99,
+      currentLocation: `In Transit — En route to ${data.chemistName}`,
+      scannedSerialCount: requestedQty,
+      verifiedSerialCount: requestedQty,
+      blockchainTxHash: `0x${Math.random().toString(16).slice(2, 10)}${Math.random().toString(16).slice(2, 10)}`,
+      auditLogs: [
+        {
+          timestamp,
+          actor: data.pharmacistName,
+          role: 'Pharmacist',
+          action: `Stock dispatched to Chemist Staff: ${data.chemistName} at ${data.destinationChemist}.`,
+        },
+      ],
+    };
+
+    this.shipments.unshift(childShipment);
+
+    this.supplyChainNotifications.unshift({
+      notificationId: `NOTIF-${Math.floor(1000 + Math.random() * 9000)}`,
+      recipientOrg: data.destinationChemist.trim(),
+      recipientRole: 'Chemist',
+      type: 'NEW_SHIPMENT',
+      title: '🔴 NEW SHIPMENT ALERT',
+      message: `${requestedQty} units of ${item.medicineName} (Batch: ${item.batchNumber}) dispatched by Central Pharmacy. Action required: Receive & Verify.`,
+      shipmentId: childShipmentId,
+      batchId: item.batchNumber,
+      medicineId: `MED-${item.batchNumber}`,
+      sourceOrg: 'Central Pharmacy',
+      sourceRole: 'Pharmacist',
+      createdAt: timestamp,
+      readAt: null,
+      actionedAt: null,
+      status: 'CREATED',
+      priority: 'high',
+      relatedRoute: 'chemist',
+    });
+
+    const block = blockchainService.addBlock({
+      transactionId: `TX-DISP-P2C-${Date.now().toString().slice(-6)}`,
+      timestamp,
+      eventType: 'DISPATCHED_BY_PHARMACIST',
+      actor: data.pharmacistName,
+      actorRole: 'Pharmacist',
+      shipmentId: childShipmentId,
+      medicineId: `MED-${item.batchNumber}`,
+      medicineName: item.medicineName,
+      batchId: item.batchNumber,
+      eventData: {
+        action: 'Pharmacist Dispatched verified stock to Chemist Staff',
+        parentShipmentId: item.shipmentId,
+        destinationChemist: data.destinationChemist,
+        chemistName: data.chemistName,
+        quantity: requestedQty,
+        itemStatus: 'Verified',
+        stage: 3,
+      },
+    });
+
+    this.persist();
+    this.addNotification(
+      'Stock Sent to Chemist',
+      `Shipment ${childShipmentId} en route to ${data.destinationChemist}.`,
+      'success'
+    );
+
+    return block;
+  }
+
+  /**
+   * 8. CHEMIST STAFF: Confirm Receipt from Pharmacist
+   */
+  public receiveChemistShipment(
+    shipmentId: string,
+    chemistName: string,
+    chemistStation: string
+  ) {
+    const timestamp = new Date().toISOString().replace('T', ' ').slice(0, 19) + ' UTC';
+    const shp = this.shipments.find((s) => s.id === shipmentId);
+
+    const relatedNotif = this.supplyChainNotifications.find((n) => n.shipmentId === shipmentId && n.status !== 'ACTIONED');
+    if (relatedNotif) {
+      relatedNotif.status = 'ACTIONED';
+      relatedNotif.actionedAt = timestamp;
+      relatedNotif.readAt = relatedNotif.readAt || timestamp;
+    }
+
+    if (shp) {
+      shp.verificationStatus = 'PASSED';
+      shp.status = 'Accepted';
+      shp.currentLocation = `${chemistName} (${chemistStation})`;
+      
+      shp.auditLogs = shp.auditLogs || [];
+      shp.auditLogs.unshift({
+        timestamp,
+        actor: chemistName,
+        role: 'Chemist Staff',
+        action: `Inbound stock received and verified at dispensing station.`,
+      });
+
+      // Add to inventory for Chemist
+      const invId = `INV-C-${shp.batchNumber.split('-')[0] || 'CH'}-${Math.floor(100 + Math.random() * 900)}`;
+      this.inventory.unshift({
+        id: invId,
+        medicineName: shp.medicineName,
+        genericName: shp.medicineName,
+        category: shp.category || 'General Therapeutics',
+        batchNumber: shp.batchNumber,
+        serialNumber: `GS1-9874-2026-${shp.batchNumber}-01`,
+        manufacturer: shp.supplier || 'Manufacturer',
+        supplier: shp.supplier || 'Pharmacy',
+        shipmentId: shp.id,
+        quantity: shp.quantity || 0,
+        expiryDate: shp.expiryDate || '2028-09-30',
+        mfgDate: '2026-09-20',
+        verificationStatus: 'Verified',
+        riskScore: shp.riskScore || 5,
+        riskLevel: 'Low',
+        location: `Counter ${chemistStation}`,
+        lastVerified: timestamp.slice(0, 16),
+        coldChainCompliant: shp.coldChainCompliant ?? true,
+        isDuplicate: false,
+        isPackagingAnomaly: false,
+      });
+    }
+
+    const block = blockchainService.addBlock({
+      transactionId: `TX-REC-C-${Date.now().toString().slice(-6)}`,
+      timestamp,
+      eventType: 'RECEIVED_BY_CHEMIST',
+      actor: `${chemistName} (${chemistStation})`,
+      actorRole: 'Chemist',
+      shipmentId,
+      medicineId: `MED-${shp?.batchNumber || 'GEN'}`,
+      medicineName: shp?.medicineName || 'Dispensing Stock',
+      batchId: shp?.batchNumber || 'BATCH-001',
+      eventData: {
+        action: 'Chemist Staff Receipt & Final Integrity Verification',
+        chemistStation,
+        status: 'VERIFIED_READY_TO_DISPENSE',
+        stage: 4,
+      },
+    });
+
+    this.persist();
+    this.addNotification(
+      'Stock Ready to Dispense',
+      `Shipment ${shipmentId} accepted and verified at Chemist station.`,
+      'success'
+    );
+
+    return block;
+  }
+
+  /**
+   * 9. CHEMIST STAFF: Dispense / Sell Medicine to Patient (FINAL STAGE)
    */
   public dispenseMedicine(
     inventoryId: string,
@@ -1972,18 +2204,19 @@ class UnifiedStoreService {
       transactionId: `TX-DISPENSE-${Date.now().toString().slice(-6)}`,
       timestamp,
       eventType: 'DISPENSED',
-      actor: 'Licensed Pharmacist Counter',
-      actorRole: 'Pharmacist',
+      actor: 'Chemist Staff Dispensing Station',
+      actorRole: 'Chemist',
       shipmentId: item?.shipmentId || 'SHP-DISP-01',
       medicineId: `MED-${item?.batchNumber || 'GEN'}`,
       medicineName: item?.medicineName || 'Prescription Medicine',
       batchId: item?.batchNumber || 'BATCH-001',
       eventData: {
-        action: 'Prescription Medicine Dispensed / Sold to Patient',
+        action: 'Medicine Dispensed to Patient by Chemist Staff',
         quantityDispensed,
         remainingStock: item?.quantity || 0,
-        patientHashTag: `PAT-VERIFIED-${Math.floor(1000 + Math.random() * 9000)}`,
+        patientHashTag: patientIdentifier,
         dispensedStatus: 'COMPLETED_VERIFIED',
+        stage: 5,
       },
     });
 
@@ -1991,16 +2224,16 @@ class UnifiedStoreService {
       id: `EVT-SALE-${Date.now()}`,
       type: 'accept',
       timestamp: 'Just now',
-      description: `${quantityDispensed} unit(s) of ${item?.medicineName || 'Medicine'} dispensed safely.`,
+      description: `${quantityDispensed} unit(s) of ${item?.medicineName || 'Medicine'} dispensed safely to patient ${patientIdentifier}.`,
       shipmentId: item?.shipmentId || 'SHP-DISPENSE',
       supplier: item?.supplier || 'Pharmacy',
-      role: 'Pharmacist',
+      role: 'Chemist',
     });
 
     this.persist();
     this.addNotification(
       'Medicine Dispensed to Patient',
-      `Blockchain transaction anchored for patient dispense. Stock updated.`,
+      `Dispensing transaction anchored by Chemist Staff.`,
       'success'
     );
 

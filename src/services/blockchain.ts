@@ -265,6 +265,7 @@ export interface BlockchainProvider {
   addBlock(
     blockData: Omit<BlockchainBlock, 'blockNumber' | 'currentHash' | 'previousHash'>
   ): BlockchainBlock;
+  getAncestryBlocks(shipmentId: string, visited?: Set<string>): BlockchainBlock[];
   verifyChain(shipmentId?: string): ChainVerificationResult;
   tamperBlockData(blockNumber: number, modifiedEventData: Record<string, any>, customNote?: string): void;
   deleteBlock(blockNumber: number): boolean;
@@ -621,6 +622,24 @@ export class LocalBlockchainProvider implements BlockchainProvider {
 
   public getBlocksForShipment(shipmentId: string): BlockchainBlock[] {
     return this.chain.filter((b) => b.shipmentId === shipmentId);
+  }
+
+  public getAncestryBlocks(shipmentId: string, visited: Set<string> = new Set()): BlockchainBlock[] {
+    if (!shipmentId || visited.has(shipmentId)) return [];
+    visited.add(shipmentId);
+
+    // Get current shipment blocks
+    const currentBlocks = this.chain.filter((b) => b.shipmentId === shipmentId);
+    
+    // Find parent shipment ID from eventData of these blocks or by searching for the first block of this shipment
+    // In our architecture, the parentShipmentId is often stored in the eventData of the DISPATCH block
+    const parentId = currentBlocks.find(b => b.eventData.parentShipmentId)?.eventData.parentShipmentId;
+
+    if (parentId) {
+      return [...this.getAncestryBlocks(parentId, visited), ...currentBlocks];
+    }
+
+    return currentBlocks;
   }
 
   public getBlock(blockNumber: number): BlockchainBlock | undefined {

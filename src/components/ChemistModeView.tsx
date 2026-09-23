@@ -44,6 +44,8 @@ import { StockScannerModal } from './StockScannerModal';
 import { EvaluatorTestCasesModal } from './EvaluatorTestCasesModal';
 import { MedicineImageUploadModal } from './MedicineImageUploadModal';
 import { unifiedStore, InventoryItem } from '../services/unifiedStore';
+import { SupplyChainTraceability } from './SupplyChainTraceability';
+import { SupplyChainNotificationCenter } from './SupplyChainNotificationCenter';
 
 interface ChemistModeViewProps {
   onAddActivity?: (desc: string, type: 'accept' | 'quarantine' | 'hold') => void;
@@ -57,7 +59,22 @@ export const ChemistModeView: React.FC<ChemistModeViewProps> = ({
   onNavigateToIncidents,
 }) => {
   const [currentMedicine, setCurrentMedicine] = useState<ScannedMedicineResult>(SAMPLE_MEDICINES[0]);
-  const [activeTab, setActiveTab] = useState<'dock' | 'inventory' | 'quarantine' | 'history'>('dock');
+  const [activeTab, setActiveTab] = useState<'receive' | 'inventory' | 'dispense' | 'quarantine' | 'history' | 'traceability'>('receive');
+
+  // Receive State
+  const [selectedInboundShipment, setSelectedInboundShipment] = useState<string>('');
+  const [chemistName, setChemistName] = useState<string>('Amit Sharma (Senior Chemist)');
+  const [chemistStation, setChemistStation] = useState<string>('Counter B-12 (OPD)');
+
+  // Dispense State
+  const [selectedInventoryForDispense, setSelectedInventoryForDispense] = useState<string>('');
+  const [dispenseQty, setDispenseQty] = useState<number>(1);
+  const [patientIdInput, setPatientIdInput] = useState<string>('PATIENT-VERIFIED-8821');
+
+  // Stage 4 Verification Workflow States
+  const [isBatchVerified, setIsBatchVerified] = useState<boolean>(false);
+  const [isQrVerified, setIsQrVerified] = useState<boolean>(false);
+  const [isColdChainVerified, setIsColdChainVerified] = useState<boolean>(false);
 
   // Modals state
   const [isScannerOpen, setIsScannerOpen] = useState(false);
@@ -89,9 +106,7 @@ export const ChemistModeView: React.FC<ChemistModeViewProps> = ({
   const [inventoryFilter, setInventoryFilter] = useState<string>('ALL');
   const [inventorySearch, setInventorySearch] = useState<string>('');
 
-  // Chemist interactive inventory state
-  const [inventoryCount, setInventoryCount] = useState<number>(currentMedicine.stockInfo.currentInventory);
-  const [batchReceived, setBatchReceived] = useState<boolean>(false);
+  // Action notification
   const [actionNotice, setActionNotice] = useState<string | null>(null);
 
   // Sync with unifiedStore
@@ -106,182 +121,87 @@ export const ChemistModeView: React.FC<ChemistModeViewProps> = ({
     };
   }, []);
 
-  const handleAcceptStock = () => {
-    const updated = inventoryCount + currentMedicine.stockInfo.incomingUnits;
-    setInventoryCount(updated);
-    setBatchReceived(true);
-    setActionNotice(
-      `Accepted batch ${currentMedicine.batchNumber}: Added +${currentMedicine.stockInfo.incomingUnits} units to Pharmacy Inventory. New on-hand stock: ${updated} units.`
-    );
-    if (onAddActivity) {
-      onAddActivity(
-        `Chemist accepted ${currentMedicine.stockInfo.incomingUnits} units of ${currentMedicine.medicineName} (Batch ${currentMedicine.batchNumber}) into active stock`,
-        'accept'
-      );
+  const shipmentsList = unifiedStore.getShipments();
+
+  useEffect(() => {
+    if (shipmentsList.length > 0 && !selectedInboundShipment) {
+      setSelectedInboundShipment(shipmentsList[0].id);
     }
-    setTimeout(() => setActionNotice(null), 5000);
+    if (inventoryList.length > 0 && !selectedInventoryForDispense) {
+      setSelectedInventoryForDispense(inventoryList[0].id);
+    }
+  }, [shipmentsList, inventoryList]);
+
+  // Reset verification when inventory selection changes
+  useEffect(() => {
+    setIsBatchVerified(false);
+    setIsQrVerified(false);
+    setIsColdChainVerified(false);
+  }, [selectedInventoryForDispense]);
+
+  const handleReceiveStock = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedInboundShipment) return;
+    unifiedStore.receiveChemistShipment(selectedInboundShipment, chemistName, chemistStation);
+    setActiveTab('inventory');
   };
 
-  const handleOpenQuarantineModal = (item?: {
-    medicineName: string;
-    batchNumber: string;
-    serialNumber: string;
-    shipmentId: string;
-    currentStatus: string;
-    riskScore: number;
-    reason: string;
-  }) => {
-    const target = item || {
-      medicineName: currentMedicine.medicineName,
-      batchNumber: currentMedicine.batchNumber,
-      serialNumber: currentMedicine.serialNumber,
-      shipmentId: 'SHP-001',
-      currentStatus: currentMedicine.isAuthentic ? 'Inbound Review' : 'Flagged Anomaly',
-      riskScore: currentMedicine.riskScore,
-      reason: currentMedicine.patientGuide.plainEnglishSummary || 'High risk verification anomaly detected at dock checkup.',
-    };
-
-    setQuarantineModalItem({
-      ...target,
-      notes: 'Locked in physical pharmacy quarantine isolation cage #2 pending regulatory directives.',
-    });
-  };
-
-  const handleConfirmQuarantine = () => {
-    if (!quarantineModalItem) return;
-
-    unifiedStore.quarantineMedicine({
-      medicineName: quarantineModalItem.medicineName,
-      batchNumber: quarantineModalItem.batchNumber,
-      serialNumber: quarantineModalItem.serialNumber,
-      shipmentId: quarantineModalItem.shipmentId,
-      reason: quarantineModalItem.reason,
-      notes: quarantineModalItem.notes,
-      reviewer: 'Chemist (Lic #DL-PH-9921)',
-    });
-
-    setBatchReceived(true);
-    setActionNotice(
-      `QUARANTINED batch ${quarantineModalItem.batchNumber}. Discrepancy logged with CDSCO gateway & inventory ledger updated.`
-    );
-
-    if (onAddActivity) {
-      onAddActivity(
-        `Chemist quarantined suspicious batch ${quarantineModalItem.batchNumber} (${quarantineModalItem.medicineName})`,
-        'quarantine'
-      );
+  const handleDispenseSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedInventoryForDispense || !isBatchVerified || !isQrVerified || !isColdChainVerified) return;
+    
+    const selectedItem = inventoryList.find(i => i.id === selectedInventoryForDispense);
+    const isRestricted = selectedItem && ['Quarantined', 'Hold', 'Requires Review', 'Rejected', 'Invalid'].includes(selectedItem.verificationStatus);
+    
+    if (isRestricted) {
+      setActionNotice(`BLOCK: Dispensing prohibited for item ${selectedItem?.id}. Status is ${selectedItem?.verificationStatus}.`);
+      return;
     }
 
-    setQuarantineModalItem(null);
-    setTimeout(() => setActionNotice(null), 5000);
+    unifiedStore.dispenseMedicine(selectedInventoryForDispense, dispenseQty, patientIdInput);
+    
+    // Reset verification states after successful dispense
+    setIsBatchVerified(false);
+    setIsQrVerified(false);
+    setIsColdChainVerified(false);
+    
+    setActiveTab('inventory');
   };
-
-  const handleConfirmRelease = () => {
-    if (!releaseModalItem) return;
-
-    const success = unifiedStore.releaseFromQuarantine({
-      batchNumber: releaseModalItem.batchNumber,
-      serialNumber: releaseModalItem.serialNumber,
-      shipmentId: releaseModalItem.shipmentId,
-      reason: releaseReason,
-      reviewer: releaseReviewer,
-      authCode: releaseAuthCode,
-    });
-
-    if (success) {
-      setActionNotice(
-        `RELEASED batch ${releaseModalItem.batchNumber} back to active inventory shelves.`
-      );
-      if (onAddActivity) {
-        onAddActivity(
-          `Authorized supervisor released batch ${releaseModalItem.batchNumber} from quarantine`,
-          'accept'
-        );
-      }
-      setReleaseModalItem(null);
-      setTimeout(() => setActionNotice(null), 5000);
-    }
-  };
-
-  const handleSelectMedicine = (med: ScannedMedicineResult) => {
-    setCurrentMedicine(med);
-    setInventoryCount(med.stockInfo.currentInventory);
-    setBatchReceived(false);
-  };
-
-  // Filtered inventory
-  const filteredInventory = inventoryList.filter((item) => {
-    const matchesSearch =
-      item.medicineName.toLowerCase().includes(inventorySearch.toLowerCase()) ||
-      item.batchNumber.toLowerCase().includes(inventorySearch.toLowerCase()) ||
-      item.serialNumber.toLowerCase().includes(inventorySearch.toLowerCase()) ||
-      item.supplier.toLowerCase().includes(inventorySearch.toLowerCase());
-
-    if (!matchesSearch) return false;
-
-    if (inventoryFilter === 'ALL') return true;
-    if (inventoryFilter === 'VERIFIED') return item.verificationStatus === 'Verified';
-    if (inventoryFilter === 'QUARANTINED') return item.verificationStatus === 'Quarantined';
-    if (inventoryFilter === 'HOLD') return item.verificationStatus === 'Hold' || item.verificationStatus === 'Requires Review';
-    if (inventoryFilter === 'EXPIRED') return item.verificationStatus === 'Expired';
-    if (inventoryFilter === 'HIGH_RISK') return item.riskScore > 60;
-    return true;
-  });
-
-  const quarantinedItems = inventoryList.filter((item) => item.verificationStatus === 'Quarantined');
 
   return (
     <div className="space-y-6">
-      {/* Dock Receiving Header Banner */}
+      {/* Header Banner */}
       <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-7 text-white shadow-md relative overflow-hidden">
         <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
           <div>
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-500/20 border border-blue-400/30 text-blue-300 text-xs font-semibold mb-3">
-              <Warehouse className="w-4 h-4 text-emerald-400" />
-              <span>Pharmacy Inbound & Stock Receiving Terminal</span>
+              <ShieldCheck className="w-4 h-4 text-emerald-400" />
+              <span>STAGE 4 — CHEMIST STAFF TERMINAL</span>
             </div>
             <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-white font-display">
-              Chemist Workspace & Operational Medicine Verification
+              Chemist Dispensing & Verification Terminal
             </h1>
             <p className="text-sm text-slate-300 mt-2 max-w-2xl">
-              Inspect incoming cartons, verify GS1 2D DataMatrix codes, run continuous stock receiving, isolate quarantined batches, and review supply-chain custody records.
+              Receive verified stock from Stage 3 Pharmacy, perform final professional checks, and dispense safely to Stage 5 Patient.
             </p>
           </div>
 
           <div className="flex flex-col sm:flex-row md:flex-col gap-2.5 shrink-0">
+             <SupplyChainNotificationCenter
+              recipientOrg={chemistStation}
+              recipientRole="Chemist"
+              onOpenShipment={(shipId) => {
+                setSelectedInboundShipment(shipId);
+                setActiveTab('receive');
+              }}
+            />
             <button
               id="btn-open-chemist-camera"
               onClick={() => setIsScannerOpen(true)}
               className="px-5 py-3 rounded-2xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs sm:text-sm flex items-center justify-center gap-2 shadow-lg shadow-blue-900/30 transition-all active:scale-95 cursor-pointer"
             >
               <Camera className="w-4 h-4" />
-              <span>Scan QR / Barcode</span>
-            </button>
-
-            <button
-              id="btn-upload-medicine-image-chemist"
-              onClick={() => setIsImageUploadOpen(true)}
-              className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-white text-xs font-bold flex items-center justify-center gap-2 transition-colors cursor-pointer"
-            >
-              <Upload className="w-4 h-4 text-blue-400" />
-              <span>Upload Medicine Image</span>
-            </button>
-
-            <button
-              id="btn-open-entire-stock-scanner"
-              onClick={() => setIsStockScannerOpen(true)}
-              className="px-4 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold flex items-center justify-center gap-2 transition-colors cursor-pointer shadow-md shadow-purple-900/20"
-            >
-              <Boxes className="w-4 h-4" />
-              <span>Scan Entire Stock</span>
-            </button>
-
-            <button
-              onClick={() => setIsTestCasesOpen(true)}
-              className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 text-xs font-medium flex items-center justify-center gap-2 transition-colors cursor-pointer"
-            >
-              <Sparkles className="w-3.5 h-3.5 text-purple-400" />
-              <span>Evaluator Test Lab (9 Cases)</span>
+              <span>Scan Patient ID / Medicine</span>
             </button>
           </div>
         </div>
@@ -290,15 +210,15 @@ export const ChemistModeView: React.FC<ChemistModeViewProps> = ({
         <div className="relative z-10 mt-6 pt-5 border-t border-slate-800 flex flex-wrap items-center justify-between gap-3">
           <div className="flex flex-wrap items-center gap-2">
             <button
-              onClick={() => setActiveTab('dock')}
+              onClick={() => setActiveTab('receive')}
               className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-2 ${
-                activeTab === 'dock'
+                activeTab === 'receive'
                   ? 'bg-blue-600 text-white shadow-md'
                   : 'bg-slate-800/80 text-slate-300 hover:bg-slate-700'
               }`}
             >
-              <Camera className="w-3.5 h-3.5" />
-              <span>Dock Inspection</span>
+              <QrCode className="w-3.5 h-3.5" />
+              <span>Receive Dock</span>
             </button>
 
             <button
@@ -310,7 +230,19 @@ export const ChemistModeView: React.FC<ChemistModeViewProps> = ({
               }`}
             >
               <Boxes className="w-3.5 h-3.5" />
-              <span>View Inventory ({inventoryList.length})</span>
+              <span>Active Stock ({inventoryList.length})</span>
+            </button>
+
+            <button
+              onClick={() => setActiveTab('dispense')}
+              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-2 ${
+                activeTab === 'dispense'
+                  ? 'bg-purple-600 text-white shadow-md'
+                  : 'bg-slate-800/80 text-slate-300 hover:bg-slate-700'
+              }`}
+            >
+              <ArrowUpRight className="w-3.5 h-3.5" />
+              <span>Dispense to Patient</span>
             </button>
 
             <button
@@ -322,339 +254,286 @@ export const ChemistModeView: React.FC<ChemistModeViewProps> = ({
               }`}
             >
               <ShieldAlert className="w-3.5 h-3.5 text-rose-400" />
-              <span>Quarantine Locker ({quarantinedItems.length})</span>
+              <span>Quarantine Locker</span>
             </button>
 
             <button
-              onClick={() => setActiveTab('history')}
+              onClick={() => setActiveTab('traceability')}
               className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-2 ${
-                activeTab === 'history'
-                  ? 'bg-blue-600 text-white shadow-md'
+                activeTab === 'traceability'
+                  ? 'bg-emerald-700 text-white shadow-md'
                   : 'bg-slate-800/80 text-slate-300 hover:bg-slate-700'
               }`}
             >
-              <Activity className="w-3.5 h-3.5" />
-              <span>Verification History</span>
+              <Blocks className="w-3.5 h-3.5 text-emerald-400" />
+              <span>Traceability Ledger</span>
             </button>
-          </div>
-
-          <div className="flex items-center gap-2 text-xs">
-            <span className="text-slate-400 hidden sm:inline">Shipment:</span>
-            {SAMPLE_MEDICINES.slice(0, 3).map((med) => (
-              <button
-                key={med.id}
-                onClick={() => {
-                  handleSelectMedicine(med);
-                  setActiveTab('dock');
-                }}
-                className={`px-2.5 py-1 rounded-lg border text-[11px] transition-colors cursor-pointer ${
-                  currentMedicine.id === med.id && activeTab === 'dock'
-                    ? 'bg-blue-600 text-white font-semibold border-blue-400'
-                    : 'bg-slate-800/60 text-slate-400 border-slate-700 hover:text-white'
-                }`}
-              >
-                {med.isAuthentic ? '📦' : '⚠️'} {med.batchNumber}
-              </button>
-            ))}
           </div>
         </div>
       </div>
 
-      {/* Action Notification Alert */}
-      {actionNotice && (
-        <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-300 text-emerald-900 flex items-center gap-3 text-sm font-medium animate-in fade-in duration-200">
-          <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
-          <span>{actionNotice}</span>
+      {/* TAB 1: RECEIVE FROM PHARMACY */}
+      {activeTab === 'receive' && (
+        <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-xs space-y-6">
+          <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+            <div>
+              <h2 className="text-base font-bold text-slate-900 font-display flex items-center gap-2">
+                <QrCode className="w-5 h-5 text-blue-600" />
+                <span>Receive Inbound Pharmacy Dispatch</span>
+              </h2>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Verifies pharmacy verified stock and adds to dispensing station inventory.
+              </p>
+            </div>
+          </div>
+
+          <form onSubmit={handleReceiveStock} className="grid grid-cols-1 sm:grid-cols-2 gap-5 text-xs">
+            <div>
+              <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1.5">
+                Select Arriving Internal Shipment
+              </label>
+              <select
+                value={selectedInboundShipment}
+                onChange={(e) => setSelectedInboundShipment(e.target.value)}
+                className="w-full bg-slate-50 border border-slate-200 text-slate-900 rounded-xl p-3 font-bold focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+              >
+                {shipmentsList.map((shp) => (
+                  <option key={shp.id} value={shp.id}>
+                    {shp.id} — {shp.medicineName} ({shp.quantity} units)
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1.5">
+                Recipient Chemist Staff Name
+              </label>
+              <input
+                type="text"
+                value={chemistName}
+                onChange={(e) => setChemistName(e.target.value)}
+                required
+                className="w-full bg-slate-50 border border-slate-200 text-slate-900 rounded-xl p-3 font-medium focus:outline-none focus:border-blue-500"
+              />
+            </div>
+
+             <div>
+              <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1.5">
+                Dispensing Station / Counter
+              </label>
+              <input
+                type="text"
+                value={chemistStation}
+                onChange={(e) => setChemistStation(e.target.value)}
+                required
+                className="w-full bg-slate-50 border border-slate-200 text-slate-900 rounded-xl p-3 font-medium focus:outline-none focus:border-blue-500"
+              />
+            </div>
+
+            <div className="sm:col-span-2 pt-2">
+              <button
+                type="submit"
+                className="w-full py-3.5 rounded-2xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs uppercase tracking-wider flex items-center justify-center gap-2 shadow-lg shadow-blue-900/20 cursor-pointer transition-all active:scale-95"
+              >
+                <CheckCircle2 className="w-4 h-4" />
+                <span>Confirm Receipt & Sign RECEIVED_BY_CHEMIST Block</span>
+              </button>
+            </div>
+          </form>
         </div>
       )}
 
-      {/* TAB 1: DOCK INSPECTION WORKBENCH */}
-      {activeTab === 'dock' && (
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-          {/* LEFT COLUMN: STOCK BUFFER & COLD CHAIN (lg:col-span-7) */}
-          <div className="lg:col-span-7 space-y-6">
-            {/* Card: Stock Idea on Checkup */}
-            <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-xs space-y-5">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2.5">
-                  <div className="w-9 h-9 rounded-xl bg-blue-50 border border-blue-200 flex items-center justify-center text-blue-700">
-                    <Boxes className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <h2 className="text-base font-bold text-slate-900 font-display">
-                      Stock & Inventory Projection on Checkup
-                    </h2>
-                    <p className="text-xs text-slate-500">
-                      Real-time pharmacy stock buffer, reorder points, and FEFO expiry safety
-                    </p>
-                  </div>
-                </div>
-
-                <span
-                  className={`text-xs font-bold px-2.5 py-1 rounded-full ${
-                    currentMedicine.stockInfo.status === 'In Stock'
-                      ? 'bg-emerald-100 text-emerald-800'
-                      : 'bg-amber-100 text-amber-800'
-                  }`}
-                >
-                  {currentMedicine.stockInfo.status}
-                </span>
-              </div>
-
-              {/* 4-Metric Stock Bar */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-                <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200">
-                  <div className="text-[11px] font-medium text-slate-500">Current On-Hand</div>
-                  <div className="text-xl font-bold text-slate-900 mt-1 font-mono">
-                    {inventoryCount}{' '}
-                    <span className="text-xs font-normal text-slate-500">units</span>
-                  </div>
-                  <div className="text-[10px] text-slate-400 mt-0.5">Physical shelves</div>
-                </div>
-
-                <div className="p-3.5 rounded-2xl bg-blue-50 border border-blue-200">
-                  <div className="text-[11px] font-medium text-blue-700">Incoming Delivery</div>
-                  <div className="text-xl font-bold text-blue-900 mt-1 font-mono">
-                    +{currentMedicine.stockInfo.incomingUnits}{' '}
-                    <span className="text-xs font-normal text-blue-700">units</span>
-                  </div>
-                  <div className="text-[10px] text-blue-600 mt-0.5">In this shipment</div>
-                </div>
-
-                <div className="p-3.5 rounded-2xl bg-emerald-50 border border-emerald-200">
-                  <div className="text-[11px] font-medium text-emerald-700">Projected Total</div>
-                  <div className="text-xl font-bold text-emerald-900 mt-1 font-mono">
-                    {inventoryCount + (batchReceived ? 0 : currentMedicine.stockInfo.incomingUnits)}{' '}
-                    <span className="text-xs font-normal text-emerald-700">units</span>
-                  </div>
-                  <div className="text-[10px] text-emerald-600 mt-0.5">After accepting</div>
-                </div>
-
-                <div className="p-3.5 rounded-2xl bg-purple-50 border border-purple-200">
-                  <div className="text-[11px] font-medium text-purple-700">Stock Buffer</div>
-                  <div className="text-xl font-bold text-purple-900 mt-1 font-mono">
-                    ~{currentMedicine.stockInfo.daysBuffer}{' '}
-                    <span className="text-xs font-normal text-purple-700">days</span>
-                  </div>
-                  <div className="text-[10px] text-purple-600 mt-0.5">Reorder: {currentMedicine.stockInfo.reorderThreshold} units</div>
-                </div>
-              </div>
-
-              {/* Stock Expiry & Safety Window */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
-                <div className="p-3 bg-white rounded-xl border border-slate-200 space-y-1">
-                  <div className="text-slate-500 font-medium flex items-center gap-1.5">
-                    <Clock className="w-3.5 h-3.5 text-blue-600" />
-                    <span>Batch Expiry Date</span>
-                  </div>
-                  <div className="font-semibold text-slate-900 font-mono text-sm">
-                    {currentMedicine.expiryDate}
-                  </div>
-                  <div className="text-[11px] text-emerald-700 font-medium">
-                    {currentMedicine.isAuthentic ? 'FEFO Safe: Over 14 months shelf-life' : '⚠️ Unverified shelf life'}
-                  </div>
-                </div>
-
-                <div className="p-3 bg-white rounded-xl border border-slate-200 space-y-1">
-                  <div className="text-slate-500 font-medium flex items-center gap-1.5">
-                    <Thermometer className="w-3.5 h-3.5 text-blue-600" />
-                    <span>Transit Temperature at Receiving</span>
-                  </div>
-                  <div className="font-semibold text-slate-900 font-mono text-sm flex items-center gap-2">
-                    <span>{currentMedicine.stockInfo.arrivalTemp}°C</span>
-                    <span
-                      className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${
-                        currentMedicine.stockInfo.tempBreached
-                          ? 'bg-rose-100 text-rose-800'
-                          : 'bg-emerald-100 text-emerald-800'
-                      }`}
-                    >
-                      {currentMedicine.stockInfo.tempBreached ? 'Excursion Alert' : 'Normal Range'}
-                    </span>
-                  </div>
-                  <div className="text-[11px] text-slate-500">
-                    Target: {currentMedicine.stockInfo.tempSafeRange}
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Card: Anti-Diversion & Duplicate Serial Checker */}
-            <div
-              className={`p-6 rounded-3xl border shadow-xs transition-all ${
-                currentMedicine.stockInfo.duplicateSerialFound
-                  ? 'bg-rose-50/70 border-rose-300 ring-2 ring-rose-200'
-                  : 'bg-white border-slate-200'
-              }`}
-            >
-              <div className="flex items-start justify-between gap-4">
-                <div className="flex items-center gap-2.5">
-                  <div
-                    className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${
-                      currentMedicine.stockInfo.duplicateSerialFound
-                        ? 'bg-rose-100 text-rose-700'
-                        : 'bg-emerald-50 text-emerald-700'
-                    }`}
-                  >
-                    <Repeat className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <h3 className="text-sm sm:text-base font-bold text-slate-900 font-display">
-                      Anti-Diversion & Duplicate Serial Detection
-                    </h3>
-                    <p className="text-xs text-slate-500">
-                      Cross-references central pharmacy network for cloned or recycled barcodes
-                    </p>
-                  </div>
-                </div>
-
-                <span
-                  className={`text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full ${
-                    currentMedicine.stockInfo.duplicateSerialFound
-                      ? 'bg-rose-600 text-white'
-                      : 'bg-emerald-100 text-emerald-800'
-                  }`}
-                >
-                  {currentMedicine.stockInfo.duplicateSerialFound ? 'Duplicate Found!' : 'Unique Serial'}
-                </span>
-              </div>
-
-              {currentMedicine.stockInfo.duplicateSerialFound ? (
-                <div className="mt-4 p-3.5 bg-rose-100 border border-rose-300 rounded-xl text-xs text-rose-950 space-y-1">
-                  <div className="font-bold flex items-center gap-1.5 text-rose-900">
-                    <AlertTriangle className="w-4 h-4 text-rose-700" />
-                    <span>CRITICAL ALERT: Serial #{currentMedicine.serialNumber} is Cloned!</span>
-                  </div>
-                  <p>
-                    This specific unit serial was recorded as dispensed:{' '}
-                    <strong>{currentMedicine.stockInfo.lastDispensedLocation}</strong>. Do NOT accept into stock.
-                  </p>
-                </div>
-              ) : (
-                <div className="mt-4 p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-600 flex items-center justify-between">
-                  <span>Unit Serial #{currentMedicine.serialNumber}</span>
-                  <span className="text-emerald-700 font-medium">0 duplicate records in national database</span>
-                </div>
-              )}
+      {/* TAB 3: DISPENSE TO PATIENT */}
+      {activeTab === 'dispense' && (
+        <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-xs space-y-6">
+          <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+            <div>
+              <h2 className="text-base font-bold text-slate-900 font-display flex items-center gap-2">
+                <ArrowUpRight className="w-5 h-5 text-purple-600" />
+                <span>Final Professional Dispense to Patient (Stage 5)</span>
+              </h2>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Executes the final supply chain transaction: Medicine to Patient.
+              </p>
             </div>
           </div>
 
-          {/* RIGHT COLUMN: OPTICAL HOLOGRAM & STOCK ACTIONS (lg:col-span-5) */}
-          <div className="lg:col-span-5 space-y-6">
-            {/* Card: 3D Hologram & Optical Seal Inspection */}
-            <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-xs space-y-4">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Sparkles className="w-5 h-5 text-amber-500" />
-                  <h3 className="text-sm font-bold text-slate-900 font-display">
-                    Hologram Optical Seal Analysis
-                  </h3>
-                </div>
-                <span
-                  className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                    currentMedicine.hologram.detected
-                      ? 'bg-emerald-100 text-emerald-800'
-                      : 'bg-rose-100 text-rose-800'
+          <form onSubmit={handleDispenseSubmit} className="grid grid-cols-1 sm:grid-cols-2 gap-5 text-xs">
+            <div>
+              <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1.5">
+                Select Dispensing Stock
+              </label>
+              <select
+                value={selectedInventoryForDispense}
+                onChange={(e) => setSelectedInventoryForDispense(e.target.value)}
+                className="w-full bg-slate-50 border border-slate-200 text-slate-900 rounded-xl p-3 font-bold focus:outline-none focus:border-blue-500"
+              >
+                {inventoryList.map((item) => (
+                  <option key={item.id} value={item.id} disabled={['Quarantined', 'Hold', 'Requires Review', 'Rejected', 'Invalid'].includes(item.verificationStatus)}>
+                    {item.medicineName} ({item.batchNumber}) — {item.quantity} available [{item.verificationStatus}]
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {(() => {
+              const selectedItem = inventoryList.find(i => i.id === selectedInventoryForDispense);
+              const isRestricted = selectedItem && ['Quarantined', 'Hold', 'Requires Review', 'Rejected', 'Invalid'].includes(selectedItem.verificationStatus);
+              if (isRestricted) {
+                return (
+                  <div className="sm:col-span-2 p-4 bg-rose-50 border border-rose-200 rounded-2xl flex items-start gap-3 animate-pulse">
+                    <AlertCircle className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
+                    <div>
+                      <h4 className="text-xs font-bold text-rose-900 uppercase">Dispensing Prohibited</h4>
+                      <p className="text-[11px] text-rose-800 mt-1">
+                        This batch is currently marked as <strong>{selectedItem?.verificationStatus}</strong>. 
+                        Safety protocol blocks all Stage 5 transactions until the batch is cleared by Regulatory (Stage 6) or Supervisor.
+                      </p>
+                    </div>
+                  </div>
+                );
+              }
+              return null;
+            })()}
+
+            <div>
+              <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1.5">
+                Quantity Dispensing
+              </label>
+              <input
+                type="number"
+                min="1"
+                value={dispenseQty}
+                onChange={(e) => setDispenseQty(Number(e.target.value))}
+                required
+                className="w-full bg-slate-50 border border-slate-200 text-slate-900 rounded-xl p-3 font-medium focus:outline-none focus:border-blue-500"
+              />
+            </div>
+
+            <div className="sm:col-span-2">
+              <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1.5">
+                Patient Identifier / Prescription ID
+              </label>
+              <input
+                type="text"
+                value={patientIdInput}
+                onChange={(e) => setPatientIdInput(e.target.value)}
+                required
+                placeholder="e.g. PATIENT-8821-X"
+                className="w-full bg-slate-50 border border-slate-200 text-slate-900 rounded-xl p-3 font-medium focus:outline-none focus:border-blue-500"
+              />
+            </div>
+
+            {/* STAGE 4 MANDATORY VERIFICATION CHECKLIST */}
+            <div className="sm:col-span-2 bg-slate-50 p-5 rounded-2xl border border-slate-200 space-y-4">
+              <div>
+                <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider flex items-center gap-2">
+                  <ShieldCheck className="w-4 h-4 text-emerald-600" />
+                  <span>Stage 4 Mandatory Professional Verification</span>
+                </h3>
+                <p className="text-[11px] text-slate-500 mt-1">
+                  All three professional checks must be completed and logged before the blockchain 'DISPENSED' block can be anchored.
+                </p>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                {/* CHECK 1: BATCH IDENTITY */}
+                <div 
+                  onClick={() => setIsBatchVerified(!isBatchVerified)}
+                  className={`p-3 rounded-xl border cursor-pointer transition-all ${
+                    isBatchVerified 
+                      ? 'bg-emerald-50 border-emerald-200 shadow-sm' 
+                      : 'bg-white border-slate-200 hover:border-blue-300'
                   }`}
                 >
-                  {currentMedicine.hologram.patternMatch}
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className="text-[10px] font-bold text-slate-500 uppercase tracking-tight">Identity</span>
+                    {isBatchVerified ? (
+                      <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                    ) : (
+                      <div className="w-4 h-4 rounded-full border-2 border-slate-300" />
+                    )}
+                  </div>
+                  <div className="text-xs font-bold text-slate-900">Batch Consistency</div>
+                  <div className="text-[10px] text-slate-500 mt-0.5 line-clamp-1">Pack matches system batch record</div>
+                </div>
+
+                {/* CHECK 2: QR/BARCODE RE-SCAN */}
+                <div 
+                  onClick={() => setIsQrVerified(!isQrVerified)}
+                  className={`p-3 rounded-xl border cursor-pointer transition-all ${
+                    isQrVerified 
+                      ? 'bg-emerald-50 border-emerald-200 shadow-sm' 
+                      : 'bg-white border-slate-200 hover:border-blue-300'
+                  }`}
+                >
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className="text-[10px] font-bold text-slate-500 uppercase tracking-tight">Digital Tag</span>
+                    {isQrVerified ? (
+                      <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                    ) : (
+                      <div className="w-4 h-4 rounded-full border-2 border-slate-300" />
+                    )}
+                  </div>
+                  <div className="text-xs font-bold text-slate-900">QR/Barcode Match</div>
+                  <div className="text-[10px] text-slate-500 mt-0.5 line-clamp-1">GS1 Secure Scan Successful</div>
+                </div>
+
+                {/* CHECK 3: COLD-CHAIN STATUS */}
+                <div 
+                  onClick={() => setIsColdChainVerified(!isColdChainVerified)}
+                  className={`p-3 rounded-xl border cursor-pointer transition-all ${
+                    isColdChainVerified 
+                      ? 'bg-emerald-50 border-emerald-200 shadow-sm' 
+                      : 'bg-white border-slate-200 hover:border-blue-300'
+                  }`}
+                >
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className="text-[10px] font-bold text-slate-500 uppercase tracking-tight">Cold-Chain</span>
+                    {isColdChainVerified ? (
+                      <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                    ) : (
+                      <div className="w-4 h-4 rounded-full border-2 border-slate-300" />
+                    )}
+                  </div>
+                  <div className="text-xs font-bold text-slate-900">Temp Compliance</div>
+                  <div className="text-[10px] text-slate-500 mt-0.5 line-clamp-1">Sensor data in range</div>
+                </div>
+              </div>
+            </div>
+
+            <div className="sm:col-span-2 pt-2">
+              <button
+                type="submit"
+                disabled={!isBatchVerified || !isQrVerified || !isColdChainVerified || (() => {
+                  const selectedItem = inventoryList.find(i => i.id === selectedInventoryForDispense);
+                  return selectedItem && ['Quarantined', 'Hold', 'Requires Review', 'Rejected', 'Invalid'].includes(selectedItem.verificationStatus);
+                })()}
+                className={`w-full py-3.5 rounded-2xl font-bold text-xs uppercase tracking-wider flex items-center justify-center gap-2 shadow-lg transition-all active:scale-95 cursor-pointer ${
+                  (isBatchVerified && isQrVerified && isColdChainVerified && !(() => {
+                    const selectedItem = inventoryList.find(i => i.id === selectedInventoryForDispense);
+                    return selectedItem && ['Quarantined', 'Hold', 'Requires Review', 'Rejected', 'Invalid'].includes(selectedItem.verificationStatus);
+                  })())
+                    ? 'bg-purple-600 hover:bg-purple-500 text-white shadow-purple-900/20'
+                    : 'bg-slate-200 text-slate-400 cursor-not-allowed shadow-none border border-slate-300'
+                }`}
+              >
+                <ArrowUpRight className="w-4 h-4" />
+                <span>
+                  {(() => {
+                    const selectedItem = inventoryList.find(i => i.id === selectedInventoryForDispense);
+                    if (selectedItem && ['Quarantined', 'Hold', 'Requires Review', 'Rejected', 'Invalid'].includes(selectedItem.verificationStatus)) {
+                      return 'Dispensing Blocked (Safety Protocol)';
+                    }
+                    return (!isBatchVerified || !isQrVerified || !isColdChainVerified) 
+                      ? 'Complete All Checks to Dispense' 
+                      : 'Final Dispense to Patient & Anchor DISPENSED Block';
+                  })()}
                 </span>
-              </div>
-
-              {/* Optical Meter */}
-              <div className="space-y-3 text-xs">
-                <div>
-                  <div className="flex items-center justify-between text-slate-600 mb-1">
-                    <span>Spectral Iridescence Shimmer</span>
-                    <span className="font-mono font-bold text-slate-800">
-                      {currentMedicine.hologram.iridescenceScore}%
-                    </span>
-                  </div>
-                  <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
-                    <div
-                      className={`h-full transition-all duration-300 ${
-                        currentMedicine.hologram.iridescenceScore > 80
-                          ? 'bg-gradient-to-r from-emerald-500 via-teal-400 to-cyan-500'
-                          : 'bg-rose-500'
-                      }`}
-                      style={{ width: `${currentMedicine.hologram.iridescenceScore}%` }}
-                    ></div>
-                  </div>
-                </div>
-
-                <div>
-                  <div className="flex items-center justify-between text-slate-600 mb-1">
-                    <span>Specular Glare Reflection Index</span>
-                    <span className="font-mono font-bold text-slate-800">
-                      {currentMedicine.hologram.specularGlareScore}%
-                    </span>
-                  </div>
-                  <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
-                    <div
-                      className="h-full bg-amber-400 transition-all duration-300"
-                      style={{ width: `${currentMedicine.hologram.specularGlareScore}%` }}
-                    ></div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-600 leading-relaxed">
-                {currentMedicine.hologram.details}
-              </div>
+              </button>
             </div>
-
-            {/* Card: Pharmacist Action Bar */}
-            <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-xs space-y-4">
-              <h3 className="text-sm font-bold text-slate-900 font-display flex items-center gap-2">
-                <ShieldCheck className="w-4 h-4 text-blue-600" />
-                <span>Inbound Decision & Stock Ledger</span>
-              </h3>
-
-              <div className="space-y-2.5">
-                <button
-                  id="btn-chemist-accept"
-                  onClick={handleAcceptStock}
-                  disabled={!currentMedicine.isAuthentic}
-                  className={`w-full py-3 px-4 rounded-xl font-bold text-xs flex items-center justify-center gap-2 transition-all shadow-sm ${
-                    currentMedicine.isAuthentic
-                      ? 'bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer active:scale-98'
-                      : 'bg-slate-200 text-slate-400 cursor-not-allowed'
-                  }`}
-                >
-                  <CheckCircle2 className="w-4 h-4" />
-                  <span>Accept Batch & Add +{currentMedicine.stockInfo.incomingUnits} to Stock</span>
-                </button>
-
-                <button
-                  id="btn-chemist-quarantine"
-                  onClick={() => handleOpenQuarantineModal()}
-                  className="w-full py-2.5 px-4 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-800 border border-rose-200 font-semibold text-xs flex items-center justify-center gap-2 transition-colors cursor-pointer"
-                >
-                  <AlertTriangle className="w-4 h-4 text-rose-600" />
-                  <span>Quarantine Batch & Block Dispensing</span>
-                </button>
-
-                <button
-                  onClick={() => setIsBlockchainOpen(true)}
-                  className="w-full py-2.5 px-4 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 font-semibold text-xs flex items-center justify-center gap-2 transition-colors cursor-pointer"
-                >
-                  <Blocks className="w-4 h-4 text-blue-600" />
-                  <span>View Blockchain Cryptographic Proof</span>
-                </button>
-
-                {onViewForensics && (
-                  <button
-                    id="btn-chemist-view-forensics"
-                    onClick={() => onViewForensics(currentMedicine.batchNumber)}
-                    className="w-full py-2.5 px-4 rounded-xl bg-purple-50 hover:bg-purple-100 text-purple-800 border border-purple-200 font-semibold text-xs flex items-center justify-center gap-2 transition-colors cursor-pointer"
-                  >
-                    <Radio className="w-4 h-4 text-purple-600" />
-                    <span>Inspect Batch Forensics & Custody Ledger</span>
-                  </button>
-                )}
-              </div>
-            </div>
-          </div>
+          </form>
         </div>
       )}
 
@@ -937,8 +816,8 @@ export const ChemistModeView: React.FC<ChemistModeViewProps> = ({
               <span>Pharmacy Receiving & Verification Audit Log</span>
             </h2>
             <button
-              onClick={() => setIsBlockchainOpen(true)}
-              className="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-semibold flex items-center gap-1.5"
+              onClick={() => setActiveTab('traceability')}
+              className="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-semibold flex items-center gap-1.5 cursor-pointer"
             >
               <Blocks className="w-3.5 h-3.5 text-blue-600" />
               <span>Verify Blockchain SHA-256 Ledger</span>
@@ -981,7 +860,15 @@ export const ChemistModeView: React.FC<ChemistModeViewProps> = ({
         </div>
       )}
 
-      {/* QUARANTINE CONFIRMATION DIALOG (Section 7) */}
+      {/* TAB 5: TRACEABILITY LEDGER */}
+      {activeTab === 'traceability' && (
+        <div className="bg-white rounded-3xl p-2 border border-slate-200 shadow-xs">
+          <SupplyChainTraceability 
+            shipmentId={inventoryList.find(i => i.id === selectedInventoryForDispense)?.shipmentId}
+            initialBatchId={inventoryList.find(i => i.id === selectedInventoryForDispense)?.batchNumber}
+          />
+        </div>
+      )}
       {quarantineModalItem && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-xs animate-in fade-in duration-150">
           <div className="bg-white rounded-3xl p-6 max-w-lg w-full shadow-2xl border border-slate-200 space-y-4">

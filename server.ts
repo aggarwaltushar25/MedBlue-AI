@@ -6,6 +6,8 @@
 import express, { Request, Response } from 'express';
 import path from 'path';
 import { createServer as createViteServer } from 'vite';
+import notificationsApiRouter, { addNotification } from './src/services/notificationsApi';
+import { SupplyChainEvent } from './src/types';
 import {
   EXECUTIVE_KPIS,
   VERIFICATION_TREND_14_DAYS,
@@ -96,9 +98,64 @@ async function startServer() {
     res.json(SUPPLIER_HEATMAP_DATA);
   });
 
-  // Action required (High-priority alerts)
-  app.get('/api/analytics/action-required', (req: Request, res: Response) => {
-    res.json(HIGH_PRIORITY_ALERTS);
+  // Supply Chain Notifications
+  app.use('/api/notifications', notificationsApiRouter);
+
+  let serverSideShipments = [...ALL_SHIPMENTS];
+  let serverSideEvents: SupplyChainEvent[] = [];
+  let lastEventHash = '00000000000000000000000000000000';
+
+  app.post('/api/shipments/dispatch', (req: Request, res: Response) => {
+    const { shipmentId, fromOrgId, toOrgId, performedBy, performedByRole, quantity } = req.body;
+    
+    const shipment = serverSideShipments.find(s => s.id === shipmentId);
+    if (!shipment) return res.status(404).json({ error: 'Shipment not found' });
+    
+    // Simple hash chain simulation
+    const crypto = require('crypto');
+    const newHash = crypto.createHash('sha256').update(lastEventHash + shipmentId + Date.now()).digest('hex');
+    
+    const event: SupplyChainEvent = {
+        eventId: `EVT-${Math.floor(Math.random()*10000)}`,
+        shipmentId,
+        medicineId: shipment.medicineName,
+        batchId: shipment.batchNumber,
+        quantity,
+        fromOrganizationId: fromOrgId,
+        toOrganizationId: toOrgId,
+        action: 'DISPATCHED',
+        performedBy,
+        performedByRole,
+        timestamp: new Date().toISOString(),
+        previousHash: lastEventHash,
+        currentHash: newHash
+    };
+    
+    serverSideEvents.unshift(event);
+    lastEventHash = newHash;
+    shipment.status = 'DISPATCHED';
+    
+    // Create persistent notification
+    const newNotification = {
+      notificationId: `NOTIF-${Math.floor(1000 + Math.random() * 9000)}`,
+      recipientOrg: toOrgId,
+      recipientRole: performedByRole === 'Manufacturer' ? 'Wholesaler' : 'Pharmacist',
+      type: 'NEW_SHIPMENT',
+      title: 'New Shipment Dispatched',
+      message: `Shipment ${shipmentId} dispatched from ${fromOrgId}.`,
+      shipmentId: shipmentId,
+      batchId: shipment.batchNumber,
+      status: 'CREATED',
+      priority: 'high',
+      createdAt: new Date().toISOString(),
+      readAt: null,
+      actionedAt: null,
+      relatedRoute: performedByRole.toLowerCase(),
+    };
+    
+    addNotification(newNotification);
+    
+    res.status(200).json({ success: true, shipment, event, notification: newNotification });
   });
 
   // Verification health donut data

@@ -232,6 +232,24 @@ export const api = {
     }
   },
 
+  getNotifications: async (recipientOrg: string, recipientRole: string): Promise<any[]> => {
+    return fetchWithFallback(`/api/notifications?recipientOrg=${encodeURIComponent(recipientOrg)}&recipientRole=${recipientRole}`, []);
+  },
+
+  triggerNotification: async (notification: any): Promise<any> => {
+    try {
+      const res = await fetch('/api/notifications/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(notification),
+      });
+      if (!res.ok) throw new Error('Failed to trigger notification');
+      return await res.json();
+    } catch {
+      return null;
+    }
+  },
+
   getShipmentById: async (id: string): Promise<ShipmentVerification | null> => {
     try {
       const res = await fetch(`/api/analytics/verifications/${id}`);

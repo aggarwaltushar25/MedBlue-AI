@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-export type VerificationStatus = 'Accepted' | 'Hold' | 'Quarantined';
+export type VerificationStatus = 'Accepted' | 'Hold' | 'Quarantined' | 'DISPATCHED' | 'RECEIVED';
 export type RiskLevel = 'All' | 'Low' | 'Medium' | 'High';
 
 export interface RiskFactorContribution {
@@ -142,6 +142,23 @@ export interface TopSupplier {
   percentage: number;
 }
 
+export interface Notification {
+  notificationId: string;
+  recipientOrg: string;
+  recipientRole: string;
+  type: string;
+  title: string;
+  message: string;
+  status: string;
+  priority: string;
+  createdAt: string;
+  readAt: string | null;
+  actionedAt: string | null;
+  relatedRoute: string;
+  shipmentId?: string;
+  batchId?: string;
+}
+
 export interface ActivityEvent {
   id: string;
   type: 'accept' | 'quarantine' | 'alert' | 'scan' | 'hold';
@@ -150,6 +167,23 @@ export interface ActivityEvent {
   shipmentId: string;
   supplier: string;
   role?: string;
+}
+
+export interface SupplyChainEvent {
+  eventId: string;
+  shipmentId: string;
+  parentShipmentId?: string;
+  medicineId: string;
+  batchId: string;
+  quantity: number;
+  fromOrganizationId: string;
+  toOrganizationId: string;
+  action: 'MANUFACTURED' | 'VERIFIED' | 'DISPATCHED' | 'RECEIVED';
+  performedBy: string;
+  performedByRole: UserRole;
+  timestamp: string; // Server-generated
+  previousHash: string;
+  currentHash: string;
 }
 
 export interface SupplierPerformance {
@@ -222,7 +256,7 @@ export interface FilterState {
 }
 
 export type UserRole =
-  | 'customer'
+  | 'patient'
   | 'chemist'
   | 'pharmacist'
   | 'wholesaler'

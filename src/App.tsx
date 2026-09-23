@@ -19,7 +19,7 @@ import { AnalyticsPage } from './components/AnalyticsPage';
 import { AlertsView } from './components/AlertsView';
 import { AuditLogView } from './components/AuditLogView';
 import { ShipmentDetailModal } from './components/ShipmentDetailModal';
-import { CustomerModeView } from './components/CustomerModeView';
+import { PatientModeView } from './components/PatientModeView';
 import { ChemistModeView } from './components/ChemistModeView';
 import { AdminModeView } from './components/AdminModeView';
 import { CameraScannerModal } from './components/CameraScannerModal';
@@ -34,6 +34,7 @@ import { LoginPage } from './components/LoginPage';
 import { ManufacturerDashboard } from './components/ManufacturerDashboard';
 import { WholesalerDashboard } from './components/WholesalerDashboard';
 import { PharmacistDashboard } from './components/PharmacistDashboard';
+import { NotificationsView } from './components/NotificationsView';
 import { unifiedStore } from './services/unifiedStore';
 
 import { api } from './services/api';
@@ -98,7 +99,7 @@ import {
 export default function App() {
   // Authentication & Role State
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
-  const [userRole, setUserRole] = useState<UserRole>('customer');
+  const [userRole, setUserRole] = useState<UserRole>('patient');
 
   // Navigation & Routing state
   const [activeTab, setActiveTab] = useState<AppNavTab>('dashboard');
@@ -124,11 +125,20 @@ export default function App() {
     const handleHash = () => {
       const rawHash = window.location.hash.replace('#', '');
       const hash = rawHash.toLowerCase();
-      if (hash === 'customer' || hash === 'patient' || hash === 'client') {
-        setUserRole('customer');
+      if (hash === 'patient' || hash === 'consumer' || hash === 'client') {
+        setUserRole('patient');
         setIsAuthenticated(true);
-      } else if (hash === 'chemist' || hash === 'pharmacist' || hash === 'stock') {
+      } else if (hash === 'chemist' || hash === 'staff') {
         setUserRole('chemist');
+        setIsAuthenticated(true);
+      } else if (hash === 'pharmacist' || hash === 'pharmacy') {
+        setUserRole('pharmacist');
+        setIsAuthenticated(true);
+      } else if (hash === 'wholesaler') {
+        setUserRole('wholesaler');
+        setIsAuthenticated(true);
+      } else if (hash === 'manufacturer') {
+        setUserRole('manufacturer');
         setIsAuthenticated(true);
       } else if (hash === 'admin') {
         setUserRole('admin');
@@ -627,9 +637,9 @@ export default function App() {
         {/* ========================================================================= */}
         {/* ROLE 1: PATIENT / CUSTOMER MODE */}
         {/* ========================================================================= */}
-        {userRole === 'customer' && (
+        {userRole === 'patient' && (
           <div className="animate-in fade-in-50 duration-150">
-            <CustomerModeView
+            <PatientModeView
               onSwitchToChemist={() => handleRoleChange('chemist')}
               onViewForensics={handleOpenBatchForensics}
             />
@@ -820,6 +830,24 @@ export default function App() {
             />
           </div>
         )}
+
+        {/* ========================================================================= */}
+        {/* NOTIFICATIONS VIEW */}
+        {/* ========================================================================= */}
+        {activeTab === 'notifications' && (
+          <div className="animate-in fade-in-50 duration-150">
+            <NotificationsView
+              onOpenShipment={(shipId) => {
+                handleInspectShipmentId(shipId);
+                setActiveTab('blockchain');
+              }}
+              onOpenBatch={(batchId) => {
+                handleOpenBatchForensics(batchId);
+              }}
+              setActiveTab={setActiveTab}
+            />
+          </div>
+        )}
       </main>
 
       {/* Footer */}
@@ -876,7 +904,7 @@ export default function App() {
       <CameraScannerModal
         isOpen={quickCameraOpen}
         onClose={() => setQuickCameraOpen(false)}
-        mode={userRole === 'customer' ? 'customer' : 'chemist'}
+        mode={userRole === 'patient' ? 'patient' : 'chemist'}
         onViewForensics={handleOpenBatchForensics}
       />
 

@@ -24,6 +24,7 @@ import { blockchainService } from '../services/blockchain';
 import { SupplyChainTraceability } from './SupplyChainTraceability';
 import { HologramVerificationPanel } from './HologramVerificationPanel';
 import { SupplyChainNotificationCenter } from './SupplyChainNotificationCenter';
+import { api } from '../services/api';
 
 export const WholesalerDashboard: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'RECEIVE_INBOUND' | 'DISPATCH_PHARMACY' | 'HISTORY' | 'TRACEABILITY'>('RECEIVE_INBOUND');
@@ -84,7 +85,7 @@ export const WholesalerDashboard: React.FC = () => {
   };
 
   // Handle dispatch to pharmacy
-  const handleDispatchPharmacy = (e: React.FormEvent) => {
+  const handleDispatchPharmacy = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedWholesalerShipment) return;
     unifiedStore.dispatchWholesalerShipment({
@@ -94,6 +95,17 @@ export const WholesalerDashboard: React.FC = () => {
       destinationStore,
       quantity: dispatchQuantity,
     });
+
+    // Trigger backend notification
+    await api.triggerNotification({
+      recipientOrg: pharmacistName,
+      recipientRole: 'Pharmacist',
+      type: 'NEW_SHIPMENT',
+      title: 'New Shipment Dispatched',
+      message: `Wholesaler ${wholesalerDepot} has dispatched ${dispatchQuantity} units to your pharmacy.`,
+      shipmentId: selectedWholesalerShipment,
+    });
+
     setActiveTab('HISTORY');
   };
 
@@ -116,6 +128,7 @@ export const WholesalerDashboard: React.FC = () => {
         <div className="flex items-center gap-3">
           <SupplyChainNotificationCenter
             recipientOrg={wholesalerDepot}
+            recipientRole="Wholesaler"
             onOpenShipment={(shipId) => {
               setSelectedInboundShipment(shipId);
               setActiveTab('RECEIVE_INBOUND');

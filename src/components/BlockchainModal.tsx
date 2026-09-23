@@ -19,14 +19,50 @@ import {
 } from 'lucide-react';
 import { ScannedMedicineResult } from '../types';
 
+import { blockchainService, BlockchainBlock } from '../services/blockchain';
+import { unifiedStore } from '../services/unifiedStore';
+
 interface BlockchainModalProps {
   medicine: ScannedMedicineResult;
   onClose: () => void;
+  shipmentId?: string;
 }
 
-export const BlockchainModal: React.FC<BlockchainModalProps> = ({ medicine, onClose }) => {
+export const BlockchainModal: React.FC<BlockchainModalProps> = ({ medicine, onClose, shipmentId }) => {
   const [copied, setCopied] = useState(false);
-  const bc = medicine.blockchain;
+  const [storeTick, setStoreTick] = useState(0);
+
+  useEffect(() => {
+    const unsub = unifiedStore.subscribe(() => setStoreTick(t => t + 1));
+    return () => unsub();
+  }, []);
+
+  const ancestryBlocks = useMemo(() => {
+    if (shipmentId) {
+      return blockchainService.getAncestryBlocks(shipmentId);
+    }
+    // Fallback to batch-based lookup if no specific shipment ID
+    return blockchainService.getChain().filter(b => b.batchId === medicine.batchNumber);
+  }, [medicine.batchNumber, shipmentId, storeTick]);
+
+  const latestBlock = ancestryBlocks[ancestryBlocks.length - 1];
+  
+  const bc = useMemo(() => {
+    if (latestBlock) {
+      return {
+        network: 'MediShield Private Ethereum Rollup',
+        blockNumber: latestBlock.blockNumber,
+        txHash: latestBlock.transactionId,
+        contractAddress: '0x88fA...91C2',
+        timestamp: latestBlock.timestamp,
+        verified: true,
+        status: 'Confirmed' as const,
+        gasUsed: '21,442 Gwei',
+        manufacturerSigner: latestBlock.actor
+      };
+    }
+    return medicine.blockchain;
+  }, [latestBlock, medicine.blockchain]);
 
   const handleCopyHash = () => {
     navigator.clipboard.writeText(bc.txHash);
@@ -164,26 +200,49 @@ export const BlockchainModal: React.FC<BlockchainModalProps> = ({ medicine, onCl
               Decentralized Custody Audit Trail
             </h4>
             <div className="space-y-2">
-              {medicine.provenance.map((step, idx) => (
-                <div
-                  key={idx}
-                  className="flex items-start gap-3 p-2.5 rounded-lg bg-slate-50 border border-slate-200 text-xs"
-                >
-                  <div className="w-5 h-5 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold text-[10px] shrink-0 mt-0.5">
-                    {idx + 1}
-                  </div>
-                  <div className="flex-1">
-                    <div className="flex items-center justify-between">
-                      <span className="font-semibold text-slate-900">{step.step}</span>
-                      <span className="text-[10px] text-slate-500">{step.timestamp}</span>
+              {ancestryBlocks.length > 0 ? (
+                ancestryBlocks.map((blk, idx) => (
+                  <div
+                    key={blk.blockNumber}
+                    className="flex items-start gap-3 p-2.5 rounded-lg bg-slate-50 border border-slate-200 text-xs"
+                  >
+                    <div className="w-5 h-5 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold text-[10px] shrink-0 mt-0.5">
+                      {idx + 1}
                     </div>
-                    <div className="text-[11px] text-slate-600">{step.actor}</div>
-                    <div className="font-mono text-[10px] text-blue-600 mt-0.5 truncate">
-                      Tx: {step.txHash}
+                    <div className="flex-1">
+                      <div className="flex items-center justify-between">
+                        <span className="font-semibold text-slate-900">{blk.eventData.action || blk.eventType}</span>
+                        <span className="text-[10px] text-slate-500">{blk.timestamp}</span>
+                      </div>
+                      <div className="text-[11px] text-slate-600">{blk.actor} ({blk.actorRole})</div>
+                      <div className="font-mono text-[10px] text-blue-600 mt-0.5 truncate">
+                        Block: #{blk.blockNumber} • Tx: {blk.transactionId}
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                ))
+              ) : (
+                medicine.provenance.map((step, idx) => (
+                  <div
+                    key={idx}
+                    className="flex items-start gap-3 p-2.5 rounded-lg bg-slate-50 border border-slate-200 text-xs"
+                  >
+                    <div className="w-5 h-5 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold text-[10px] shrink-0 mt-0.5">
+                      {idx + 1}
+                    </div>
+                    <div className="flex-1">
+                      <div className="flex items-center justify-between">
+                        <span className="font-semibold text-slate-900">{step.step}</span>
+                        <span className="text-[10px] text-slate-500">{step.timestamp}</span>
+                      </div>
+                      <div className="text-[11px] text-slate-600">{step.actor}</div>
+                      <div className="font-mono text-[10px] text-blue-600 mt-0.5 truncate">
+                        Tx: {step.txHash}
+                      </div>
+                    </div>
+                  </div>
+                ))
+              )}
             </div>
           </div>
         </div>

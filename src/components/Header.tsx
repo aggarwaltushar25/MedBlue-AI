@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   ShieldCheck,
   Activity,
@@ -28,6 +28,7 @@ import {
 } from 'lucide-react';
 import { FilterState, UserRole } from '../types';
 import { unifiedStore } from '../services/unifiedStore';
+import { notificationService } from '../services/notificationService';
 
 export type AppNavTab =
   | 'dashboard'
@@ -37,7 +38,8 @@ export type AppNavTab =
   | 'forensics'
   | 'regulatory'
   | 'incidents'
-  | 'blockchain';
+  | 'blockchain'
+  | 'notifications';
 
 interface HeaderProps {
   activeTab: AppNavTab;
@@ -80,6 +82,19 @@ export const Header: React.FC<HeaderProps> = ({
     }
   };
 
+  const [unreadNotifCount, setUnreadNotifCount] = useState(0);
+
+  useEffect(() => {
+    const update = () => {
+      const notifs = notificationService.getSupplyChainNotifications();
+      const unread = notifs.filter((n) => n.status !== 'READ' && n.status !== 'ACTIONED').length;
+      setUnreadNotifCount(unread);
+    };
+    update();
+    const unsub = notificationService.subscribe(update);
+    return () => unsub();
+  }, []);
+
   return (
     <header className="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-xs">
       {/* Top Banner with Role Context, Demo Mode Indicator & Reset Demo Data */}
@@ -88,7 +103,7 @@ export const Header: React.FC<HeaderProps> = ({
           <div className="flex items-center gap-1.5 font-medium text-slate-300 truncate">
             <Building2 className="w-3.5 h-3.5 text-blue-400 shrink-0" />
             <span className="font-semibold text-white truncate">
-              {userRole === 'customer'
+              {userRole === 'patient'
                 ? 'Patient Verification Portal'
                 : userRole === 'manufacturer'
                 ? 'Manufacturer Command Hub'
@@ -169,7 +184,7 @@ export const Header: React.FC<HeaderProps> = ({
                 </span>
                 <span
                   className={`text-[9px] sm:text-[10px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full border ${
-                    userRole === 'customer'
+                    userRole === 'patient'
                       ? 'bg-blue-50 text-blue-700 border-blue-200'
                       : userRole === 'chemist'
                       ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
@@ -178,7 +193,7 @@ export const Header: React.FC<HeaderProps> = ({
                       : 'bg-slate-100 text-slate-800 border-slate-200'
                   }`}
                 >
-                  {userRole === 'customer'
+                  {userRole === 'patient'
                     ? 'Patient Workspace'
                     : userRole === 'chemist'
                     ? 'Chemist Terminal'
@@ -193,7 +208,24 @@ export const Header: React.FC<HeaderProps> = ({
 
         {/* Right Desktop Actions */}
         <div className="hidden md:flex items-center gap-3">
-          {(userRole === 'customer' || userRole === 'chemist') && (
+          <button
+            onClick={() => setActiveTab('notifications')}
+            className={`px-3.5 py-1.5 rounded-xl text-xs font-bold flex items-center gap-2 border transition-all cursor-pointer relative shrink-0 ${
+              activeTab === 'notifications'
+                ? 'bg-indigo-600 text-white border-indigo-500 shadow-md'
+                : 'bg-slate-100 hover:bg-slate-200 border-slate-300 text-slate-700'
+            }`}
+          >
+            <Bell className="w-3.5 h-3.5" />
+            <span>Notifications</span>
+            {unreadNotifCount > 0 && (
+              <span className="w-4 h-4 rounded-full bg-rose-600 text-white text-[10px] flex items-center justify-center font-bold">
+                {unreadNotifCount}
+              </span>
+            )}
+          </button>
+
+          {(userRole === 'patient' || userRole === 'chemist') && (
             <button
               id="header-btn-camera"
               onClick={onOpenQuickCamera}
@@ -240,7 +272,7 @@ export const Header: React.FC<HeaderProps> = ({
           </div>
 
           {/* Quick Scanner Action on Mobile */}
-          {(userRole === 'customer' || userRole === 'chemist') && (
+          {(userRole === 'patient' || userRole === 'chemist') && (
             <button
               onClick={() => {
                 onOpenQuickCamera();
@@ -297,7 +329,7 @@ export const Header: React.FC<HeaderProps> = ({
       )}
 
       {/* Patient / Customer Secondary Sub-Tabs (Only visible in Patient mode) */}
-      {userRole === 'customer' && (
+      {userRole === 'patient' && (
         <div className="bg-blue-950/10 border-t border-blue-200 px-4 sm:px-6 py-2">
           <div className="max-w-7xl mx-auto flex items-center gap-1 overflow-x-auto">
             <button

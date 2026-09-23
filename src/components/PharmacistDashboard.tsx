@@ -24,6 +24,7 @@ import { SupplyChainTraceability } from './SupplyChainTraceability';
 import { HologramVerificationPanel } from './HologramVerificationPanel';
 import { ShieldCheck } from 'lucide-react';
 import { SupplyChainNotificationCenter } from './SupplyChainNotificationCenter';
+import { api } from '../services/api';
 
 export const PharmacistDashboard: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'RECEIVE_DOCK' | 'INVENTORY' | 'DISPENSE' | 'TRACEABILITY'>('RECEIVE_DOCK');
@@ -49,10 +50,11 @@ export const PharmacistDashboard: React.FC = () => {
   const [invExpiryDate, setInvExpiryDate] = useState<string>('2028-09-19');
   const [invShelfLocation, setInvShelfLocation] = useState<string>('Cold Vault Row A-04');
 
-  // Dispense Form
-  const [selectedInventoryForDispense, setSelectedInventoryForDispense] = useState<string>('');
-  const [dispenseQty, setDispenseQty] = useState<number>(1);
-  const [patientIdInput, setPatientIdInput] = useState<string>('PATIENT-VERIFIED-8821');
+  // Dispatch to Chemist Form
+  const [selectedInventoryForDispatch, setSelectedInventoryForDispatch] = useState<string>('');
+  const [dispatchQtyToChemist, setDispatchQtyToChemist] = useState<number>(100);
+  const [chemistNameInput, setChemistNameInput] = useState<string>('Amit Sharma (Senior Chemist)');
+  const [chemistStationInput, setChemistStationInput] = useState<string>('Counter B-12 (OPD)');
 
   useEffect(() => {
     const unsub = unifiedStore.subscribe(() => setStoreTick((t) => t + 1));
@@ -68,8 +70,8 @@ export const PharmacistDashboard: React.FC = () => {
     if (shipmentsList.length > 0 && !selectedInboundShipment) {
       setSelectedInboundShipment(shipmentsList[0].id);
     }
-    if (inventoryList.length > 0 && !selectedInventoryForDispense) {
-      setSelectedInventoryForDispense(inventoryList[0].id);
+    if (inventoryList.length > 0 && !selectedInventoryForDispatch) {
+      setSelectedInventoryForDispatch(inventoryList[0].id);
     }
   }, [shipmentsList, inventoryList]);
 
@@ -117,11 +119,31 @@ export const PharmacistDashboard: React.FC = () => {
     setActiveTab('INVENTORY');
   };
 
-  // Handle Dispense
-  const handleDispenseSubmit = (e: React.FormEvent) => {
+  // Handle Dispatch to Chemist
+  const handleDispatchSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedInventoryForDispense) return;
-    unifiedStore.dispenseMedicine(selectedInventoryForDispense, dispenseQty, patientIdInput);
+    if (!selectedInventoryForDispatch) return;
+    
+    const invItem = inventoryList.find(i => i.id === selectedInventoryForDispatch);
+    
+    unifiedStore.dispatchPharmacistToChemist({
+      inventoryId: selectedInventoryForDispatch,
+      pharmacistName,
+      chemistName: chemistNameInput,
+      destinationChemist: chemistStationInput,
+      quantity: dispatchQtyToChemist
+    });
+
+    // Trigger backend notification for Chemist Staff (Stage 4)
+    await api.triggerNotification({
+      recipientOrg: chemistStationInput,
+      recipientRole: 'chemist',
+      type: 'NEW_DISPATCH',
+      title: 'Incoming Stock from Pharmacy',
+      message: `${pharmacistName} has dispatched ${dispatchQtyToChemist} units of ${invItem?.medicineName || 'medicine'} to your station.`,
+      batchId: invItem?.batchNumber,
+    });
+
     setActiveTab('INVENTORY');
   };
 
@@ -133,17 +155,18 @@ export const PharmacistDashboard: React.FC = () => {
           <div className="flex items-center gap-2">
             <Store className="w-6 h-6 text-purple-400" />
             <h1 className="text-xl font-bold text-white uppercase tracking-wider">
-              Licensed Pharmacist Dispensing Terminal
+              STAGE 3 — LICENSED PHARMACY DASHBOARD
             </h1>
           </div>
           <p className="text-xs text-slate-400 mt-1">
-            Dock Inbound Verification, FEFO Inventory Stock Management, and Patient Dispensing Anchors.
+            Bulk Stock Receiving, Pharmaceutical Inventory Control, and Internal Dispatch to Chemist Staff (Stage 4).
           </p>
         </div>
 
         <div className="flex items-center gap-3">
           <SupplyChainNotificationCenter
             recipientOrg="Fortis Hospital Central Pharmacy"
+            recipientRole="Pharmacist"
             onOpenShipment={(shipId) => {
               setSelectedInboundShipment(shipId);
               setActiveTab('RECEIVE_DOCK');
@@ -184,8 +207,8 @@ export const PharmacistDashboard: React.FC = () => {
                 : 'text-slate-400 hover:text-white'
             }`}
           >
-            <ShoppingBag className="w-3.5 h-3.5" />
-            <span>Dispense / Sell</span>
+            <Plus className="w-3.5 h-3.5" />
+            <span>Dispatch to Chemist</span>
           </button>
 
           <button
@@ -468,34 +491,34 @@ export const PharmacistDashboard: React.FC = () => {
         </div>
       )}
 
-      {/* TAB 3: DISPENSE TO PATIENT */}
+      {/* TAB 3: DISPATCH TO CHEMIST */}
       {activeTab === 'DISPENSE' && (
         <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl shadow-md space-y-6">
           <div className="flex items-center justify-between border-b border-slate-800 pb-4">
             <div>
               <h2 className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2">
-                <ShoppingBag className="w-4 h-4 text-purple-400" />
-                <span>Dispense / Sell Medicine to Patient (DISPENSED Block)</span>
+                <Plus className="w-4 h-4 text-purple-400" />
+                <span>Dispatch Verified Stock to Chemist Staff (Stage 4)</span>
               </h2>
               <p className="text-xs text-slate-400 mt-0.5">
-                Decrements inventory stock, signs patient transaction, and anchors final DISPENSED block on blockchain.
+                Allocates bulk pharmacy stock to specific chemist dispensing stations for final patient delivery.
               </p>
             </div>
           </div>
 
-          <form onSubmit={handleDispenseSubmit} className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+          <form onSubmit={handleDispatchSubmit} className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
             <div>
               <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">
-                Select Stock Item to Dispense
+                Select Active Inventory Item
               </label>
               <select
-                value={selectedInventoryForDispense}
-                onChange={(e) => setSelectedInventoryForDispense(e.target.value)}
+                value={selectedInventoryForDispatch}
+                onChange={(e) => setSelectedInventoryForDispatch(e.target.value)}
                 className="w-full bg-slate-950 border border-slate-800 text-white rounded-lg p-2.5 font-bold focus:outline-none focus:border-purple-500"
               >
                 {inventoryList.map((item) => (
                   <option key={item.id} value={item.id}>
-                    {item.medicineName} ({item.batchNumber}) — {item.quantity} Left
+                    {item.medicineName} ({item.batchNumber}) — {item.quantity} In Stock
                   </option>
                 ))}
               </select>
@@ -503,26 +526,39 @@ export const PharmacistDashboard: React.FC = () => {
 
             <div>
               <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">
-                Quantity Dispensing
+                Quantity to Dispatch
               </label>
               <input
                 type="number"
                 min="1"
-                value={dispenseQty}
-                onChange={(e) => setDispenseQty(Number(e.target.value))}
+                value={dispatchQtyToChemist}
+                onChange={(e) => setDispatchQtyToChemist(Number(e.target.value))}
                 required
                 className="w-full bg-slate-950 border border-slate-800 text-white rounded-lg p-2.5 font-medium focus:outline-none focus:border-purple-500"
               />
             </div>
 
-            <div className="sm:col-span-2">
+            <div>
               <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">
-                Patient Identifier Hash Tag (Prescription ID)
+                Recipient Chemist Staff Name
               </label>
               <input
                 type="text"
-                value={patientIdInput}
-                onChange={(e) => setPatientIdInput(e.target.value)}
+                value={chemistNameInput}
+                onChange={(e) => setChemistNameInput(e.target.value)}
+                required
+                className="w-full bg-slate-950 border border-slate-800 text-white rounded-lg p-2.5 font-medium focus:outline-none focus:border-purple-500"
+              />
+            </div>
+
+            <div>
+              <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">
+                Dispensing Station / Counter
+              </label>
+              <input
+                type="text"
+                value={chemistStationInput}
+                onChange={(e) => setChemistStationInput(e.target.value)}
                 required
                 className="w-full bg-slate-950 border border-slate-800 text-white rounded-lg p-2.5 font-medium focus:outline-none focus:border-purple-500"
               />
@@ -533,8 +569,8 @@ export const PharmacistDashboard: React.FC = () => {
                 type="submit"
                 className="w-full py-3 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs uppercase tracking-wider flex items-center justify-center gap-2 shadow-lg shadow-purple-600/30 cursor-pointer"
               >
-                <ShoppingBag className="w-4 h-4" />
-                <span>Dispense to Patient & Sign DISPENSED Blockchain Event</span>
+                <Plus className="w-4 h-4" />
+                <span>Dispatch to Chemist & Sign DISPATCHED_BY_PHARMACIST Block</span>
               </button>
             </div>
           </form>

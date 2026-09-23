@@ -135,7 +135,7 @@ export const PRESET_IMAGE_SAMPLES: PresetImageSample[] = [
 interface MedicineImageUploadModalProps {
   isOpen: boolean;
   onClose: () => void;
-  mode?: 'customer' | 'chemist';
+  mode?: 'patient' | 'chemist';
   onScanComplete?: (result: ScannedMedicineResult) => void;
   onViewForensics?: (batchNumber: string) => void;
   onOpenManualCodeEntry?: () => void;
@@ -144,7 +144,7 @@ interface MedicineImageUploadModalProps {
 export const MedicineImageUploadModal: React.FC<MedicineImageUploadModalProps> = ({
   isOpen,
   onClose,
-  mode = 'customer',
+  mode = 'patient',
   onScanComplete,
   onViewForensics,
   onOpenManualCodeEntry,
@@ -802,7 +802,7 @@ export const MedicineImageUploadModal: React.FC<MedicineImageUploadModalProps> =
                   className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl flex items-center gap-1.5 cursor-pointer shadow-md shadow-emerald-900/20"
                 >
                   <CheckCircle2 className="w-4 h-4" />
-                  <span>{mode === 'customer' ? 'Done / Safe' : 'Accept & Sync Stock'}</span>
+                  <span>{mode === 'patient' ? 'Done / Safe' : 'Accept & Sync Stock'}</span>
                 </button>
               </>
             )}

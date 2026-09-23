@@ -23,6 +23,7 @@ import {
 } from 'lucide-react';
 import { unifiedStore } from '../services/unifiedStore';
 import { blockchainService } from '../services/blockchain';
+import { SupplyChainNotificationCenter } from './SupplyChainNotificationCenter';
 import { SupplyChainTraceability } from './SupplyChainTraceability';
 
 export const ManufacturerDashboard: React.FC = () => {
@@ -154,6 +155,16 @@ export const ManufacturerDashboard: React.FC = () => {
           <p className="text-xs text-slate-400 mt-1">
             Pharmaceutical Batch Genesis, Encrypted Serial Generation, and Wholesaler Dispatch Controls.
           </p>
+        </div>
+
+        <div className="flex items-center gap-3">
+          <SupplyChainNotificationCenter
+            recipientOrg={manufacturerName}
+            recipientRole="Manufacturer"
+            onOpenShipment={(shipId) => {
+              setActiveTab('OUTGOING');
+            }}
+          />
         </div>
 
         {/* Navigation Tabs */}

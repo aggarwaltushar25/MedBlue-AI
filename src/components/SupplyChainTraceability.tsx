@@ -28,6 +28,7 @@ import { unifiedStore } from '../services/unifiedStore';
 
 interface SupplyChainTraceabilityProps {
   initialBatchId?: string;
+  shipmentId?: string;
   onSelectIncident?: (incidentId: string) => void;
 }
 
@@ -43,10 +44,12 @@ export interface SupplyChainStage {
 }
 
 export const SupplyChainTraceability: React.FC<SupplyChainTraceabilityProps> = ({
-  initialBatchId = 'AMX-2026-081',
+  initialBatchId,
+  shipmentId,
   onSelectIncident,
 }) => {
-  const [selectedBatch, setSelectedBatch] = useState<string>(initialBatchId);
+  const [selectedBatch, setSelectedBatch] = useState<string>(initialBatchId || 'AMX-2026-081');
+  const [selectedShipmentId, setSelectedShipmentId] = useState<string | undefined>(shipmentId);
   const [chainBlocks, setChainBlocks] = useState<BlockchainBlock[]>([]);
   const [storeTick, setStoreTick] = useState<number>(0);
 
@@ -59,27 +62,33 @@ export const SupplyChainTraceability: React.FC<SupplyChainTraceabilityProps> = (
     };
   }, []);
 
-  // Fetch all blocks from blockchainService
+  // Fetch all blocks or ancestry blocks
   useEffect(() => {
-    const allBlocks = blockchainService.getChain();
-    setChainBlocks(allBlocks);
-  }, [storeTick]);
+    if (selectedShipmentId) {
+      const blocks = blockchainService.getAncestryBlocks(selectedShipmentId);
+      setChainBlocks(blocks);
+    } else {
+      const allBlocks = blockchainService.getChain();
+      setChainBlocks(allBlocks);
+    }
+  }, [storeTick, selectedShipmentId]);
 
   // Available batches
   const availableBatches = useMemo(() => {
     const batchSet = new Set<string>();
-    chainBlocks.forEach((b) => {
+    blockchainService.getChain().forEach((b) => {
       if (b.batchId) batchSet.add(b.batchId);
     });
     return Array.from(batchSet);
-  }, [chainBlocks]);
+  }, [storeTick]);
 
-  // Filter blocks for selected batch
+  // Filter blocks for selected batch (if no shipmentId)
   const batchBlocks = useMemo(() => {
+    if (selectedShipmentId) return chainBlocks;
     return chainBlocks.filter(
       (b) => b.batchId.toLowerCase() === selectedBatch.toLowerCase()
     );
-  }, [chainBlocks, selectedBatch]);
+  }, [chainBlocks, selectedBatch, selectedShipmentId]);
 
   // Detect Supply Chain Chain Integrity & Anomalies
   const anomalyAnalysis = useMemo(() => {

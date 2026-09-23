@@ -11,17 +11,18 @@ import {
   Info,
   X,
 } from 'lucide-react';
-import { ToastNotification, unifiedStore } from '../services/unifiedStore';
+import { ToastNotification } from '../services/unifiedStore';
+import { notificationService } from '../services/notificationService';
 
 export const ToastNotificationCenter: React.FC = () => {
   const [notifications, setNotifications] = useState<ToastNotification[]>([]);
 
   useEffect(() => {
     const updateNotifs = () => {
-      setNotifications(unifiedStore.getNotifications());
+      setNotifications(notificationService.getToastNotifications());
     };
     updateNotifs();
-    const unsubscribe = unifiedStore.subscribe(updateNotifs);
+    const unsubscribe = notificationService.subscribe(updateNotifs);
     return () => {
       unsubscribe();
     };
@@ -50,7 +51,6 @@ export const ToastNotificationCenter: React.FC = () => {
             {notif.type === 'error' && <ShieldAlert className="w-5 h-5 text-rose-400" />}
             {notif.type === 'info' && <Info className="w-5 h-5 text-blue-400" />}
           </div>
-
           <div className="flex-1 min-w-0">
             <div className="flex items-center justify-between">
               <h4 className="text-xs font-bold font-display text-white">{notif.title}</h4>
@@ -58,9 +58,8 @@ export const ToastNotificationCenter: React.FC = () => {
             </div>
             <p className="text-[11px] text-slate-300 mt-0.5 leading-relaxed">{notif.message}</p>
           </div>
-
           <button
-            onClick={() => unifiedStore.removeNotification(notif.id)}
+            onClick={() => notificationService.removeToastNotification(notif.id)}
             className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
           >
             <X className="w-3.5 h-3.5" />

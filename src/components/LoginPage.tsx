@@ -102,18 +102,18 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSelectRole }) => {
                 <Factory className="w-5 h-5" />
               </div>
               <div className="inline-block px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-purple-500/10 text-purple-400 border border-purple-500/20 mb-2">
-                Stage 1 — Manufacturing
+                STAGE 1 — MANUFACTURER
               </div>
               <h3 className="text-lg font-bold text-white mb-1 group-hover:text-purple-300 transition-colors">
                 Manufacturer
               </h3>
               <p className="text-xs text-slate-400 leading-relaxed mb-4">
-                Register batch genesis, assign encrypted GS1 serial tags, set storage limits, and create shipments for wholesalers.
+                Register batch genesis, assign encrypted GS1 serial tags, and dispatch to wholesalers.
               </p>
             </div>
 
             <div className="pt-3 border-t border-slate-800/80 flex items-center justify-between text-xs font-bold text-purple-400 group-hover:text-purple-300">
-              <span>Open Manufacturer Hub</span>
+              <span>Open Hub</span>
               <ArrowRight className="w-4 h-4 transform group-hover:translate-x-1 transition-transform" />
             </div>
           </div>
@@ -125,21 +125,21 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSelectRole }) => {
           >
             <div>
               <div className="w-10 h-10 rounded-xl bg-amber-600/20 border border-amber-500/40 flex items-center justify-center text-amber-400 mb-3 group-hover:scale-110 transition-transform">
-                <Building className="w-5 h-5" />
+                <Truck className="w-5 h-5" />
               </div>
               <div className="inline-block px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-amber-500/10 text-amber-400 border border-amber-500/20 mb-2">
-                Stage 2 — Wholesaler
+                STAGE 2 — WHOLESALER
               </div>
               <h3 className="text-lg font-bold text-white mb-1 group-hover:text-amber-300 transition-colors">
-                Wholesaler / Distributor
+                Wholesaler
               </h3>
               <p className="text-xs text-slate-400 leading-relaxed mb-4">
-                Scan incoming shipments, audit cold-storage reefer conditions, confirm depot receipts, and dispatch to pharmacies.
+                Receive bulk shipments, audit cold-chain reefer conditions, and dispatch to licensed pharmacies.
               </p>
             </div>
 
             <div className="pt-3 border-t border-slate-800/80 flex items-center justify-between text-xs font-bold text-amber-400 group-hover:text-amber-300">
-              <span>Open Wholesaler Depot</span>
+              <span>Open Depot</span>
               <ArrowRight className="w-4 h-4 transform group-hover:translate-x-1 transition-transform" />
             </div>
           </div>
@@ -154,70 +154,70 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSelectRole }) => {
                 <Store className="w-5 h-5" />
               </div>
               <div className="inline-block px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 mb-2">
-                Stage 3 — Licensed Pharmacy
+                STAGE 3 — LICENSED PHARMACY
               </div>
               <h3 className="text-lg font-bold text-white mb-1 group-hover:text-emerald-300 transition-colors">
                 Pharmacist (Licensed)
               </h3>
               <p className="text-xs text-slate-400 leading-relaxed mb-4">
-                Verify incoming stock, manage active inventory, enforce FEFO expiry rules, and record patient dispensing transactions.
+                Verify incoming stock, manage active inventory, and dispatch verified units to Chemist Staff.
               </p>
             </div>
 
             <div className="pt-3 border-t border-slate-800/80 flex items-center justify-between text-xs font-bold text-emerald-400 group-hover:text-emerald-300">
-              <span>Open Pharmacist Terminal</span>
+              <span>Open Terminal</span>
               <ArrowRight className="w-4 h-4 transform group-hover:translate-x-1 transition-transform" />
             </div>
           </div>
 
-          {/* 4. Patient / Client */}
-          <div
-            onClick={() => onSelectRole('customer')}
-            className="group relative bg-slate-900 hover:bg-slate-850 border border-slate-800 hover:border-blue-500/60 rounded-2xl p-5 transition-all duration-300 hover:shadow-xl hover:shadow-blue-500/10 cursor-pointer flex flex-col justify-between"
-          >
-            <div>
-              <div className="w-10 h-10 rounded-xl bg-blue-600/20 border border-blue-500/40 flex items-center justify-center text-blue-400 mb-3 group-hover:scale-110 transition-transform">
-                <User className="w-5 h-5" />
-              </div>
-              <div className="inline-block px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-blue-500/10 text-blue-400 border border-blue-500/20 mb-2">
-                Stage 4 — Consumer Patient
-              </div>
-              <h3 className="text-lg font-bold text-white mb-1 group-hover:text-blue-300 transition-colors">
-                Patient / Client
-              </h3>
-              <p className="text-xs text-slate-400 leading-relaxed mb-4">
-                Scan medicine strips, upload photos, and view simplified, plain-English verification & supply-chain confirmation.
-              </p>
-            </div>
-
-            <div className="pt-3 border-t border-slate-800/80 flex items-center justify-between text-xs font-bold text-blue-400 group-hover:text-blue-300">
-              <span>Verify Medicine</span>
-              <ArrowRight className="w-4 h-4 transform group-hover:translate-x-1 transition-transform" />
-            </div>
-          </div>
-
-          {/* 5. Chemist */}
+          {/* 4. Chemist Staff */}
           <div
             onClick={() => onSelectRole('chemist')}
             className="group relative bg-slate-900 hover:bg-slate-850 border border-slate-800 hover:border-teal-500/60 rounded-2xl p-5 transition-all duration-300 hover:shadow-xl hover:shadow-teal-500/10 cursor-pointer flex flex-col justify-between"
           >
             <div>
               <div className="w-10 h-10 rounded-xl bg-teal-600/20 border border-teal-500/40 flex items-center justify-center text-teal-400 mb-3 group-hover:scale-110 transition-transform">
-                <Store className="w-5 h-5" />
+                <User className="w-5 h-5" />
               </div>
               <div className="inline-block px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-teal-500/10 text-teal-400 border border-teal-500/20 mb-2">
-                Dock Operations
+                STAGE 4 — CHEMIST STAFF
               </div>
               <h3 className="text-lg font-bold text-white mb-1 group-hover:text-teal-300 transition-colors">
                 Chemist Staff
               </h3>
               <p className="text-xs text-slate-400 leading-relaxed mb-4">
-                Receive stock shipments, scan DataMatrix packaging, isolate suspicious batches, and manage vault quarantine.
+                Final professional checkpoint. Receive from Pharmacy, perform full verification, and dispense to Patients.
               </p>
             </div>
 
             <div className="pt-3 border-t border-slate-800/80 flex items-center justify-between text-xs font-bold text-teal-400 group-hover:text-teal-300">
-              <span>Open Chemist Dock</span>
+              <span>Open Staff Desk</span>
+              <ArrowRight className="w-4 h-4 transform group-hover:translate-x-1 transition-transform" />
+            </div>
+          </div>
+
+          {/* 5. Patient */}
+          <div
+            onClick={() => onSelectRole('patient')}
+            className="group relative bg-slate-900 hover:bg-slate-850 border border-slate-800 hover:border-blue-500/60 rounded-2xl p-5 transition-all duration-300 hover:shadow-xl hover:shadow-blue-500/10 cursor-pointer flex flex-col justify-between"
+          >
+            <div>
+              <div className="w-10 h-10 rounded-xl bg-blue-600/20 border border-blue-500/40 flex items-center justify-center text-blue-400 mb-3 group-hover:scale-110 transition-transform">
+                <CheckCircle2 className="w-5 h-5" />
+              </div>
+              <div className="inline-block px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-blue-500/10 text-blue-400 border border-blue-500/20 mb-2">
+                STAGE 5 — CONSUMER PATIENT
+              </div>
+              <h3 className="text-lg font-bold text-white mb-1 group-hover:text-blue-300 transition-colors">
+                Patient / Client
+              </h3>
+              <p className="text-xs text-slate-400 leading-relaxed mb-4">
+                The final recipient. Scan dispensed medicine to view the complete verified supply-chain journey.
+              </p>
+            </div>
+
+            <div className="pt-3 border-t border-slate-800/80 flex items-center justify-between text-xs font-bold text-blue-400 group-hover:text-blue-300">
+              <span>Verify Medicine</span>
               <ArrowRight className="w-4 h-4 transform group-hover:translate-x-1 transition-transform" />
             </div>
           </div>
@@ -238,7 +238,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSelectRole }) => {
                 Administrator
               </h3>
               <p className="text-xs text-slate-400 leading-relaxed mb-4">
-                System operational dashboard, macro verification trends, audit logs, and cold-chain compliance oversight.
+                System operational dashboard, macro verification trends, audit logs, and compliance oversight.
               </p>
             </div>
 
@@ -251,25 +251,25 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSelectRole }) => {
           {/* 7. Regulator */}
           <div
             onClick={() => onSelectRole('regulatory')}
-            className="group relative bg-slate-900 hover:bg-slate-850 border border-slate-800 hover:border-rose-500/60 rounded-2xl p-5 transition-all duration-300 hover:shadow-xl hover:shadow-rose-500/10 cursor-pointer flex flex-col justify-between sm:col-span-2 lg:col-span-2"
+            className="group relative bg-slate-900 hover:bg-slate-850 border border-slate-800 hover:border-rose-500/60 rounded-2xl p-5 transition-all duration-300 hover:shadow-xl hover:shadow-rose-500/10 cursor-pointer flex flex-col justify-between lg:col-span-2"
           >
             <div>
               <div className="w-10 h-10 rounded-xl bg-rose-600/20 border border-rose-500/40 flex items-center justify-center text-rose-400 mb-3 group-hover:scale-110 transition-transform">
                 <ShieldAlert className="w-5 h-5" />
               </div>
               <div className="inline-block px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-rose-500/10 text-rose-300 border border-rose-500/20 mb-2">
-                CDSCO & State Drug Inspection Authority
+                CDSCO & STATE DRUG AUTHORITY
               </div>
               <h3 className="text-lg font-bold text-white mb-1 group-hover:text-rose-300 transition-colors">
                 Regulator & Drug Vigilance
               </h3>
               <p className="text-xs text-slate-400 leading-relaxed mb-4">
-                Investigate counterfeit rings, view interactive geographic risk maps, inspect complete blockchain supply-chain histories, and export legally anchored evidence packages.
+                Investigate counterfeit rings, inspect complete blockchain supply-chain histories, and export legal evidence.
               </p>
             </div>
 
             <div className="pt-3 border-t border-slate-800/80 flex items-center justify-between text-xs font-bold text-rose-400 group-hover:text-rose-300">
-              <span>Open Regulatory Intelligence Dashboard</span>
+              <span>Open Intelligence Dashboard</span>
               <ArrowRight className="w-4 h-4 transform group-hover:translate-x-1 transition-transform" />
             </div>
           </div>

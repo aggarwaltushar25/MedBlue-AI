@@ -42,7 +42,7 @@ interface CameraScannerModalProps {
   isOpen: boolean;
   onClose: () => void;
   onScanComplete?: (result: ScannedMedicineResult) => void;
-  mode: 'customer' | 'chemist';
+  mode: 'patient' | 'chemist';
   onViewForensics?: (batchNumber: string) => void;
 }
 
@@ -409,7 +409,7 @@ export const CameraScannerModal: React.FC<CameraScannerModalProps> = ({
             <div>
               <h2 className="text-sm sm:text-base font-bold text-white flex items-center gap-2 font-display">
                 <span>
-                  {mode === 'customer'
+                  {mode === 'patient'
                     ? 'Scan Medicine QR & Hologram Seal'
                     : 'Dock Inbound Scanner • GS1 Batch & Optical Check'}
                 </span>
@@ -424,7 +424,7 @@ export const CameraScannerModal: React.FC<CameraScannerModalProps> = ({
                 </span>
               </h2>
               <p className="text-xs text-slate-400">
-                {mode === 'customer'
+                {mode === 'patient'
                   ? 'Detects batch-specific GS1 2D DataMatrix and diffractive security holograms.'
                   : 'Automated batch-lookup query against CDSCO gateway & cross-supplier ledger.'}
               </p>
@@ -831,7 +831,7 @@ export const CameraScannerModal: React.FC<CameraScannerModalProps> = ({
                     className="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-semibold flex items-center gap-1.5 transition-colors cursor-pointer shadow-xs"
                   >
                     <CheckCircle2 className="w-4 h-4" />
-                    <span>{mode === 'customer' ? 'Done / Safe' : 'Accept & Sync Stock'}</span>
+                    <span>{mode === 'patient' ? 'Done / Safe' : 'Accept & Sync Stock'}</span>
                   </button>
                 </div>
               </div>
