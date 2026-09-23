@@ -28,6 +28,13 @@ import { RegulatoryIntelligenceDashboard } from './components/RegulatoryIntellig
 import { IncidentManagementView } from './components/IncidentManagementView';
 import { IncidentDetailModal } from './components/IncidentDetailModal';
 import { EntityProfileModal } from './components/EntityProfileModal';
+import { BlockchainView } from './components/BlockchainView';
+import { ToastNotificationCenter } from './components/ToastNotificationCenter';
+import { LoginPage } from './components/LoginPage';
+import { ManufacturerDashboard } from './components/ManufacturerDashboard';
+import { WholesalerDashboard } from './components/WholesalerDashboard';
+import { PharmacistDashboard } from './components/PharmacistDashboard';
+import { unifiedStore } from './services/unifiedStore';
 
 import { api } from './services/api';
 import {
@@ -89,14 +96,18 @@ import {
 } from './data/regulatoryData';
 
 export default function App() {
-  // User Role State: 'customer' (patient) | 'chemist' (dock receiving & stock) | 'admin' (macro suite) | 'regulatory' (gov vigilance)
-  const [userRole, setUserRole] = useState<UserRole>('regulatory');
+  // Authentication & Role State
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
+  const [userRole, setUserRole] = useState<UserRole>('customer');
 
   // Navigation & Routing state
-  const [activeTab, setActiveTab] = useState<AppNavTab>('regulatory');
+  const [activeTab, setActiveTab] = useState<AppNavTab>('dashboard');
 
   // Selected batch for Batch Forensics view
   const [selectedForensicsBatch, setSelectedForensicsBatch] = useState<string>('AMX-2026-081');
+
+  // Selected shipment for Blockchain Traceability view
+  const [selectedBlockchainShipment, setSelectedBlockchainShipment] = useState<string>('ALL');
 
   // Quick Camera Scanner State (opened from header)
   const [quickCameraOpen, setQuickCameraOpen] = useState<boolean>(false);
@@ -113,19 +124,35 @@ export default function App() {
     const handleHash = () => {
       const rawHash = window.location.hash.replace('#', '');
       const hash = rawHash.toLowerCase();
-      if (hash === 'customer' || hash === 'patient') {
+      if (hash === 'customer' || hash === 'patient' || hash === 'client') {
         setUserRole('customer');
+        setIsAuthenticated(true);
       } else if (hash === 'chemist' || hash === 'pharmacist' || hash === 'stock') {
         setUserRole('chemist');
+        setIsAuthenticated(true);
       } else if (hash === 'admin') {
         setUserRole('admin');
         setActiveTab('dashboard');
+        setIsAuthenticated(true);
       } else if (hash === 'regulatory' || hash === 'gov' || hash === 'cdsco') {
         setUserRole('regulatory');
         setActiveTab('regulatory');
+        setIsAuthenticated(true);
+      } else if (hash === 'login') {
+        setIsAuthenticated(false);
+      } else if (hash.startsWith('blockchain')) {
+        setActiveTab('blockchain');
+        setIsAuthenticated(true);
+        const parts = rawHash.split(':');
+        if (parts.length > 1 && parts[1]) {
+          setSelectedBlockchainShipment(parts[1]);
+        } else {
+          setSelectedBlockchainShipment('ALL');
+        }
       } else if (hash.startsWith('incidents') || hash.startsWith('incident')) {
         setUserRole('regulatory');
         setActiveTab('incidents');
+        setIsAuthenticated(true);
         const parts = rawHash.split(':');
         if (parts.length > 1 && parts[1]) {
           const incId = parts[1];
@@ -134,24 +161,30 @@ export default function App() {
         }
       } else if (hash.startsWith('store') || hash.startsWith('regulatory/store')) {
         setUserRole('regulatory');
+        setIsAuthenticated(true);
         const parts = rawHash.split(':');
         const storeId = parts.length > 1 ? parts[1] : 'STORE-DEL-01';
         handleOpenEntityProfile(storeId, 'store');
       } else if (hash.startsWith('supplier') || hash.startsWith('regulatory/supplier')) {
         setUserRole('regulatory');
+        setIsAuthenticated(true);
         const parts = rawHash.split(':');
         const suppId = parts.length > 1 ? parts[1] : 'SUP-MEDROUTE';
         handleOpenEntityProfile(suppId, 'supplier');
       } else if (hash === 'analytics') {
         setUserRole('admin');
         setActiveTab('analytics');
+        setIsAuthenticated(true);
       } else if (hash === 'alerts') {
         setUserRole('admin');
         setActiveTab('alerts');
+        setIsAuthenticated(true);
       } else if (hash === 'audit' || hash === 'audit-log') {
         setActiveTab('audit');
+        setIsAuthenticated(true);
       } else if (hash.startsWith('forensics')) {
         setActiveTab('forensics');
+        setIsAuthenticated(true);
         const parts = rawHash.split(':');
         if (parts.length > 1 && parts[1]) {
           setSelectedForensicsBatch(parts[1]);
@@ -164,8 +197,29 @@ export default function App() {
     return () => window.removeEventListener('hashchange', handleHash);
   }, []);
 
+  const handleRoleSelectFromLogin = (role: UserRole) => {
+    setUserRole(role);
+    setIsAuthenticated(true);
+    if (role === 'regulatory') {
+      setActiveTab('regulatory');
+      window.location.hash = '#regulatory';
+    } else if (role === 'admin') {
+      setActiveTab('dashboard');
+      window.location.hash = '#admin';
+    } else {
+      setActiveTab('dashboard');
+      window.location.hash = `#${role}`;
+    }
+  };
+
+  const handleSignOut = () => {
+    setIsAuthenticated(false);
+    window.location.hash = '#login';
+  };
+
   const handleRoleChange = (role: UserRole) => {
     setUserRole(role);
+    setIsAuthenticated(true);
     if (role === 'regulatory') {
       setActiveTab('regulatory');
       window.location.hash = '#regulatory';
@@ -193,6 +247,17 @@ export default function App() {
       window.location.hash = '#forensics';
     }
     setActiveTab('forensics');
+  };
+
+  const handleOpenBlockchainView = (shipmentId?: string) => {
+    if (shipmentId) {
+      setSelectedBlockchainShipment(shipmentId);
+      window.location.hash = `#blockchain:${shipmentId}`;
+    } else {
+      setSelectedBlockchainShipment('ALL');
+      window.location.hash = '#blockchain';
+    }
+    setActiveTab('blockchain');
   };
 
   // Regulatory Helpers
@@ -313,8 +378,28 @@ export default function App() {
   // Modal State
   const [selectedShipment, setSelectedShipment] = useState<ShipmentVerification | null>(null);
 
-  // Fetch initial API metrics
+  // Fetch initial API metrics & subscribe to unifiedStore for reactive global updates
   useEffect(() => {
+    const syncFromStore = () => {
+      const storeShipments = unifiedStore.getShipments();
+      const storeIncidents = unifiedStore.getIncidents();
+      const storeAudit = unifiedStore.getAuditEvents();
+      const storeKPIs = unifiedStore.getKPIs();
+
+      setIncidents(storeIncidents);
+      setActivityEvents(storeAudit);
+      setKpiData(storeKPIs);
+      setShipmentsPageData((prev) => ({
+        ...prev,
+        items: storeShipments.slice(0, 10),
+        total: storeShipments.length,
+        totalPages: Math.ceil(storeShipments.length / 10),
+      }));
+    };
+
+    syncFromStore();
+    const unsubscribe = unifiedStore.subscribe(syncFromStore);
+
     async function loadData() {
       try {
         const [
@@ -357,7 +442,6 @@ export default function App() {
           api.getReports(),
         ]);
 
-        setKpiData(kpis);
         setTrendData(trend);
         setRiskDistribution(riskDist);
         setHeatmapData(heatmap);
@@ -365,7 +449,6 @@ export default function App() {
         setHealthData(health);
         setColdChainData(coldChain);
         setTopSuppliers(topSupp);
-        setActivityEvents(activity);
         setOutcomesData(outcomes);
         setHistogramData(histo);
         setSupplierPerformance(suppPerf);
@@ -381,6 +464,10 @@ export default function App() {
     }
 
     loadData();
+
+    return () => {
+      unsubscribe();
+    };
   }, []);
 
   // Load table data with filters
@@ -489,18 +576,48 @@ export default function App() {
     (i) => i.status !== 'CLOSED' && i.status !== 'ACTION TAKEN'
   ).length;
 
+  // Google Maps Quota Exceeded Banner State
+  const [gmpQuotaExceeded, setGmpQuotaExceeded] = useState<boolean>(false);
+  useEffect(() => {
+    const handleQuotaExceeded = () => setGmpQuotaExceeded(true);
+    window.addEventListener('gmp-quota-exceeded', handleQuotaExceeded);
+    return () => window.removeEventListener('gmp-quota-exceeded', handleQuotaExceeded);
+  }, []);
+
+  if (!isAuthenticated) {
+    return <LoginPage onSelectRole={handleRoleSelectFromLogin} />;
+  }
+
   return (
     <div className="min-h-screen bg-[#F8FAFC] text-slate-800 flex flex-col font-sans selection:bg-purple-100 selection:text-purple-900">
+      {/* Quota Exceeded Banner */}
+      {gmpQuotaExceeded && (
+        <div className="bg-amber-50 border-b border-amber-200 text-amber-900 px-4 py-2.5 text-xs md:text-sm text-center sticky top-0 z-50 shadow-sm">
+          <span>
+            Google Maps Platform quota reached. If you are the app owner, visit{' '}
+            <a
+              href="https://developers.google.com/maps/ai/ai-studio?utm_campaign=gmp_mcp_codeassist_v1_aistudio#quota_exceeded_errors"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="underline font-semibold text-amber-950 hover:text-amber-800"
+            >
+              maps developer site
+            </a>{' '}
+            for instructions to update your account.
+          </span>
+        </div>
+      )}
+
       {/* Universal Top Navigation Header */}
       <Header
         activeTab={activeTab}
         setActiveTab={handleTabChange}
         userRole={userRole}
-        setUserRole={handleRoleChange}
         onOpenQuickCamera={() => setQuickCameraOpen(true)}
         filters={filters}
         onClearFilters={handleClearAllFilters}
         onExportPDF={() => window.print()}
+        onSignOut={handleSignOut}
         unreadAlertsCount={alerts.length}
         openIncidentsCount={openIncidentsCount}
       />
@@ -520,7 +637,34 @@ export default function App() {
         )}
 
         {/* ========================================================================= */}
-        {/* ROLE 2: CHEMIST / PHARMACIST MODE */}
+        {/* ROLE: MANUFACTURER DASHBOARD */}
+        {/* ========================================================================= */}
+        {userRole === 'manufacturer' && (
+          <div className="animate-in fade-in-50 duration-150">
+            <ManufacturerDashboard />
+          </div>
+        )}
+
+        {/* ========================================================================= */}
+        {/* ROLE: WHOLESALER DASHBOARD */}
+        {/* ========================================================================= */}
+        {userRole === 'wholesaler' && (
+          <div className="animate-in fade-in-50 duration-150">
+            <WholesalerDashboard />
+          </div>
+        )}
+
+        {/* ========================================================================= */}
+        {/* ROLE: PHARMACIST DASHBOARD */}
+        {/* ========================================================================= */}
+        {userRole === 'pharmacist' && (
+          <div className="animate-in fade-in-50 duration-150">
+            <PharmacistDashboard />
+          </div>
+        )}
+
+        {/* ========================================================================= */}
+        {/* ROLE 2: CHEMIST / PHARMACIST DOCK MODE */}
         {/* ========================================================================= */}
         {userRole === 'chemist' && (
           <div className="animate-in fade-in-50 duration-150">
@@ -651,6 +795,20 @@ export default function App() {
         )}
 
         {/* ========================================================================= */}
+        {/* BLOCKCHAIN TRACEABILITY & VERIFICATION VIEW */}
+        {/* ========================================================================= */}
+        {activeTab === 'blockchain' && (
+          <div className="animate-in fade-in-50 duration-150">
+            <BlockchainView
+              initialShipmentId={selectedBlockchainShipment}
+              onSelectShipmentId={handleInspectShipmentId}
+              onOpenForensics={handleOpenBatchForensics}
+              onBackToDashboard={() => setActiveTab(userRole === 'regulatory' ? 'regulatory' : 'dashboard')}
+            />
+          </div>
+        )}
+
+        {/* ========================================================================= */}
         {/* AUDIT LOG VIEW */}
         {/* ========================================================================= */}
         {(userRole === 'admin' || userRole === 'regulatory') && activeTab === 'audit' && (
@@ -685,6 +843,7 @@ export default function App() {
           onClose={() => setSelectedShipment(null)}
           onUpdateStatus={handleUpdateShipmentStatus}
           onInspectBatchForensics={handleOpenBatchForensics}
+          onViewBlockchainHistory={handleOpenBlockchainView}
         />
       )}
 
@@ -698,6 +857,7 @@ export default function App() {
           onOpenEntityProfile={handleOpenEntityProfile}
           onOpenRelatedIncident={handleOpenIncidentDetail}
           onOpenForensics={handleOpenBatchForensics}
+          onViewBlockchainHistory={handleOpenBlockchainView}
         />
       )}
 
@@ -719,6 +879,9 @@ export default function App() {
         mode={userRole === 'customer' ? 'customer' : 'chemist'}
         onViewForensics={handleOpenBatchForensics}
       />
+
+      {/* Real-Time Toast Notifications */}
+      <ToastNotificationCenter />
     </div>
   );
 }

@@ -6,6 +6,7 @@
 import React, { useState } from 'react';
 import {
   Camera,
+  Upload,
   ShieldCheck,
   AlertTriangle,
   Blocks,
@@ -21,11 +22,14 @@ import {
   AlertCircle,
   Building,
   Radio,
+  Search,
 } from 'lucide-react';
 import { ScannedMedicineResult } from '../types';
 import { SAMPLE_MEDICINES } from '../data/medicineScanSamples';
 import { CameraScannerModal } from './CameraScannerModal';
 import { BlockchainModal } from './BlockchainModal';
+import { MedicineImageUploadModal } from './MedicineImageUploadModal';
+import { unifiedStore } from '../services/unifiedStore';
 
 interface CustomerModeViewProps {
   onSwitchToChemist: () => void;
@@ -39,6 +43,7 @@ export const CustomerModeView: React.FC<CustomerModeViewProps> = ({
   // Currently displayed verified medicine (defaults to genuine Augmentin 625 for instant demonstration)
   const [currentMedicine, setCurrentMedicine] = useState<ScannedMedicineResult>(SAMPLE_MEDICINES[0]);
   const [isScannerOpen, setIsScannerOpen] = useState(false);
+  const [isImageUploadOpen, setIsImageUploadOpen] = useState(false);
   const [isBlockchainOpen, setIsBlockchainOpen] = useState(false);
 
   const isSafe = currentMedicine.isAuthentic;
@@ -75,8 +80,17 @@ export const CustomerModeView: React.FC<CustomerModeViewProps> = ({
             </button>
 
             <button
+              id="btn-upload-medicine-image-patient"
+              onClick={() => setIsImageUploadOpen(true)}
+              className="px-5 py-3 rounded-xl bg-blue-600/60 hover:bg-blue-600/80 border border-blue-400/40 text-white font-bold text-xs sm:text-sm flex items-center justify-center gap-2 transition-colors cursor-pointer"
+            >
+              <Upload className="w-4 h-4 text-white" />
+              <span>Upload Medicine Image</span>
+            </button>
+
+            <button
               onClick={() => setIsBlockchainOpen(true)}
-              className="px-4 py-2.5 rounded-xl bg-blue-600/40 hover:bg-blue-600/60 border border-blue-400/30 text-white font-medium text-xs flex items-center justify-center gap-2 transition-colors cursor-pointer"
+              className="px-4 py-2.5 rounded-xl bg-blue-900/40 hover:bg-blue-900/60 border border-blue-400/30 text-white font-medium text-xs flex items-center justify-center gap-2 transition-colors cursor-pointer"
             >
               <Blocks className="w-4 h-4 text-cyan-300" />
               <span>View Blockchain Safety Proof</span>
@@ -246,6 +260,92 @@ export const CustomerModeView: React.FC<CustomerModeViewProps> = ({
           </div>
         </div>
 
+        {/* Simplified Supply Chain Verification Flow */}
+        <div className="mt-5 p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-3">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
+              <ShieldCheck className="w-4 h-4 text-emerald-600" />
+              <span>Supply Chain Journey Verification</span>
+            </span>
+            <span className="text-[11px] text-emerald-700 font-bold bg-emerald-100 px-2 py-0.5 rounded-full">
+              Full Traceability Available
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 text-xs">
+            <div className="p-2.5 rounded-xl bg-white border border-slate-200 text-center space-y-1">
+              <span className="text-[10px] text-slate-500 font-semibold uppercase block">Manufactured</span>
+              <span className="font-bold text-emerald-600 flex items-center justify-center gap-1">
+                <CheckCircle2 className="w-3.5 h-3.5" />
+                <span>Verified ✓</span>
+              </span>
+            </div>
+
+            <div className="p-2.5 rounded-xl bg-white border border-slate-200 text-center space-y-1">
+              <span className="text-[10px] text-slate-500 font-semibold uppercase block">Wholesaler Received</span>
+              <span className="font-bold text-emerald-600 flex items-center justify-center gap-1">
+                <CheckCircle2 className="w-3.5 h-3.5" />
+                <span>Verified ✓</span>
+              </span>
+            </div>
+
+            <div className="p-2.5 rounded-xl bg-white border border-slate-200 text-center space-y-1">
+              <span className="text-[10px] text-slate-500 font-semibold uppercase block">Pharmacist Received</span>
+              <span className="font-bold text-emerald-600 flex items-center justify-center gap-1">
+                <CheckCircle2 className="w-3.5 h-3.5" />
+                <span>Verified ✓</span>
+              </span>
+            </div>
+
+            <div className="p-2.5 rounded-xl bg-white border border-slate-200 text-center space-y-1">
+              <span className="text-[10px] text-slate-500 font-semibold uppercase block">Verification</span>
+              <span className="font-bold text-emerald-600 flex items-center justify-center gap-1">
+                <CheckCircle2 className="w-3.5 h-3.5" />
+                <span>Available ✓</span>
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* Consumer Hologram / Packaging Verification Card */}
+        <div className="mt-5 p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-3">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
+              <ShieldCheck className="w-4 h-4 text-blue-600" />
+              <span>Hologram & Packaging Security Check</span>
+            </span>
+            <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${
+              isSafe ? 'text-emerald-700 bg-emerald-100' : 'text-rose-700 bg-rose-100'
+            }`}>
+              {isSafe ? 'Hologram/packaging appears consistent' : 'Additional verification recommended'}
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+            <div className="p-3 bg-white rounded-xl border border-slate-200 space-y-1">
+              <span className="font-semibold text-slate-800 block">Official Batch Reference</span>
+              <p className="text-slate-600">
+                {isSafe
+                  ? 'Official GS1 diffractive security hologram registered by manufacturer.'
+                  : 'Hologram pattern mismatch or missing reference seal.'}
+              </p>
+            </div>
+
+            <div className="p-3 bg-white rounded-xl border border-slate-200 space-y-1">
+              <span className="font-semibold text-slate-800 block">Verification Status</span>
+              <p className="text-slate-600">
+                {isSafe
+                  ? '✓ Hologram verification available and passed.'
+                  : '⚠️ Flagged for visual inspection by pharmacist.'}
+              </p>
+            </div>
+          </div>
+
+          <p className="text-[11px] text-slate-500 italic border-t border-slate-200/80 pt-2">
+            Disclaimer: Hologram verification is one safety signal and should be combined with barcode scanning and pharmacy verification. It does not replace full supply chain integrity checks.
+          </p>
+        </div>
+
         {/* Clear Instructions on How to Take and Store */}
         <div className="mt-5 pt-5 border-t border-slate-100 grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
           <div className="p-3.5 bg-blue-50/60 rounded-xl border border-blue-100">
@@ -347,6 +447,15 @@ export const CustomerModeView: React.FC<CustomerModeViewProps> = ({
         onClose={() => setIsScannerOpen(false)}
         onScanComplete={(result) => setCurrentMedicine(result)}
         mode="customer"
+        onViewForensics={onViewForensics}
+      />
+
+      {/* Dedicated Medicine Image Upload Modal */}
+      <MedicineImageUploadModal
+        isOpen={isImageUploadOpen}
+        onClose={() => setIsImageUploadOpen(false)}
+        mode="customer"
+        onScanComplete={(result) => setCurrentMedicine(result)}
         onViewForensics={onViewForensics}
       />
 

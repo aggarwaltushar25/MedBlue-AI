@@ -102,7 +102,7 @@ export const AuditLogView: React.FC<AuditLogViewProps> = ({
       </div>
 
       {/* Audit Log Table */}
-      <div className="bg-white rounded-lg border border-slate-200 shadow-xs overflow-hidden">
+      <div className="bg-white rounded-lg border border-slate-200 shadow-xs overflow-hidden overflow-x-auto">
         <table className="w-full text-left text-xs border-collapse">
           <thead className="bg-slate-50 text-slate-700 uppercase font-semibold text-[10px] tracking-wider border-b border-slate-200">
             <tr>

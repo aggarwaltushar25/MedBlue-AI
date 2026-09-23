@@ -279,7 +279,7 @@ export const MockQRTestUtility: React.FC<MockQRTestUtilityProps> = ({
                 <span>Configure Mock DataMatrix Parameters</span>
               </div>
 
-              <div className="grid grid-cols-2 gap-2 text-xs">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
                 <div>
                   <label className="text-[10px] uppercase font-bold text-slate-400 block mb-1">
                     Batch Code (AI 10)

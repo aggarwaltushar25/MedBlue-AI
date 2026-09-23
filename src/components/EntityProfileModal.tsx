@@ -180,7 +180,7 @@ export const EntityProfileModal: React.FC<EntityProfileModalProps> = ({
           {activeTab === 'overview' && (
             <div className="space-y-4">
               {/* Top Stats Cards */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
                 <div className="p-3.5 rounded-xl bg-slate-950 border border-slate-800 space-y-1">
                   <span className="text-[10px] uppercase font-bold text-slate-400 block">Total Shipments</span>
                   <div className="font-mono text-xl font-extrabold text-white">{profile.totalShipments}</div>
@@ -229,7 +229,7 @@ export const EntityProfileModal: React.FC<EntityProfileModalProps> = ({
                   <span className="text-purple-400 font-mono">{profile.incidentCount} total events</span>
                 </h3>
 
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-xs">
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2 text-xs">
                   <div className="p-2.5 rounded-lg bg-slate-900 border border-slate-800 flex items-center justify-between">
                     <span className="text-slate-300">Duplicate Serials</span>
                     <span className="font-mono font-bold text-rose-400">{profile.incidentSummary.duplicateSerials}</span>

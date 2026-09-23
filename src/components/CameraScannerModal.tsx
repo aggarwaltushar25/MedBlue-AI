@@ -36,6 +36,7 @@ import {
   BatchLookupResponse,
 } from '../utils/batchQrScanner';
 import { MockQRTestUtility } from './MockQRTestUtility';
+import { unifiedStore } from '../services/unifiedStore';
 
 interface CameraScannerModalProps {
   isOpen: boolean;
@@ -502,22 +503,32 @@ export const CameraScannerModal: React.FC<CameraScannerModalProps> = ({
               <div className="w-12 h-12 rounded-full bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-400 mb-3">
                 <AlertTriangle className="w-6 h-6" />
               </div>
-              <h3 className="text-sm font-semibold text-white mb-1">Camera Standby / Permission Needed</h3>
-              <p className="text-xs text-slate-400 max-w-md mb-4">{cameraError}</p>
+              <h3 className="text-sm font-bold text-white mb-1">Camera unavailable</h3>
+              <p className="text-xs text-slate-400 max-w-md mb-4">
+                Camera access was not granted or video sensor is busy. You can enter the medicine code manually or upload a package photo.
+              </p>
               <div className="flex flex-wrap items-center justify-center gap-2">
                 <button
+                  id="btn-enter-code-manually"
+                  onClick={() => setShowManualBatchInput(true)}
+                  className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-xs font-bold text-white flex items-center gap-1.5 transition-colors cursor-pointer shadow-md shadow-blue-900/30"
+                >
+                  <Search className="w-3.5 h-3.5" />
+                  <span>Enter Code Manually</span>
+                </button>
+                <button
                   onClick={() => startCamera(facingMode)}
-                  className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
+                  className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-slate-200 flex items-center gap-1.5 transition-colors cursor-pointer border border-slate-700"
                 >
                   <RefreshCw className="w-3.5 h-3.5" />
-                  <span>Retry Camera Access</span>
+                  <span>Retry Camera</span>
                 </button>
                 <button
                   onClick={() => fileInputRef.current?.click()}
-                  className="px-4 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer border border-slate-700"
+                  className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-slate-200 flex items-center gap-1.5 transition-colors cursor-pointer border border-slate-700"
                 >
                   <Upload className="w-3.5 h-3.5" />
-                  <span>Upload Medicine Photo</span>
+                  <span>Upload Photo</span>
                 </button>
               </div>
             </div>
@@ -793,6 +804,27 @@ export const CameraScannerModal: React.FC<CameraScannerModalProps> = ({
                 </button>
 
                 <div className="flex items-center gap-2">
+                  {mode === 'chemist' && (
+                    <button
+                      id="btn-quarantine-from-scanner"
+                      onClick={() => {
+                        unifiedStore.quarantineMedicine({
+                          medicineName: scanSuccess.medicineName,
+                          batchNumber: scanSuccess.batchNumber,
+                          serialNumber: scanSuccess.serialNumber,
+                          shipmentId: 'SHP-SCANNER-DIRECT',
+                          reason: scanSuccess.patientGuide.plainEnglishSummary || 'Flagged during physical camera inspection.',
+                          notes: `Optical score: ${scanSuccess.hologram.iridescenceScore}%, Risk: ${scanSuccess.riskScore}/100`,
+                        });
+                        handleAcceptAndClose();
+                      }}
+                      className="px-3.5 py-2 rounded-lg bg-rose-700 hover:bg-rose-600 text-white font-bold flex items-center gap-1.5 transition-colors cursor-pointer shadow-xs"
+                    >
+                      <AlertTriangle className="w-4 h-4" />
+                      <span>Quarantine Medicine</span>
+                    </button>
+                  )}
+
                   <button
                     id="btn-accept-stock-verification"
                     onClick={handleAcceptAndClose}

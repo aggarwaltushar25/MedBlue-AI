@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React from 'react';
+import React, { useState } from 'react';
 import {
   ShieldCheck,
   Activity,
@@ -21,8 +21,13 @@ import {
   ShieldAlert,
   Sparkles,
   Layers,
+  Link2,
+  RotateCcw,
+  Menu,
+  LogOut,
 } from 'lucide-react';
 import { FilterState, UserRole } from '../types';
+import { unifiedStore } from '../services/unifiedStore';
 
 export type AppNavTab =
   | 'dashboard'
@@ -31,17 +36,18 @@ export type AppNavTab =
   | 'audit'
   | 'forensics'
   | 'regulatory'
-  | 'incidents';
+  | 'incidents'
+  | 'blockchain';
 
 interface HeaderProps {
   activeTab: AppNavTab;
   setActiveTab: (tab: AppNavTab) => void;
   userRole: UserRole;
-  setUserRole: (role: UserRole) => void;
   onOpenQuickCamera: () => void;
   filters: FilterState;
   onClearFilters: () => void;
   onExportPDF: () => void;
+  onSignOut?: () => void;
   unreadAlertsCount?: number;
   openIncidentsCount?: number;
 }
@@ -50,14 +56,16 @@ export const Header: React.FC<HeaderProps> = ({
   activeTab,
   setActiveTab,
   userRole,
-  setUserRole,
   onOpenQuickCamera,
   filters,
   onClearFilters,
   onExportPDF,
+  onSignOut,
   unreadAlertsCount = 4,
   openIncidentsCount = 7,
 }) => {
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+
   const hasActiveFilters =
     filters.statusFilter !== 'All' ||
     filters.supplier !== 'All suppliers' ||
@@ -65,68 +73,102 @@ export const Header: React.FC<HeaderProps> = ({
     filters.riskLevel !== 'All' ||
     Boolean(filters.searchQuery);
 
+  const handleResetDemo = () => {
+    if (confirm('Reset all demo data to clean baseline state (MED-001..MED-005)?')) {
+      unifiedStore.resetDemoData();
+      setIsMobileMenuOpen(false);
+    }
+  };
+
   return (
     <header className="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-xs">
-      {/* Top Banner with Role Context & Security Node */}
-      <div className="bg-slate-900 text-slate-200 text-xs px-4 sm:px-6 py-1.5 flex flex-wrap items-center justify-between gap-2">
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-1.5 font-medium text-slate-300">
-            <Building2 className="w-3.5 h-3.5 text-blue-400" />
-            <span className="font-semibold text-white">
+      {/* Top Banner with Role Context, Demo Mode Indicator & Reset Demo Data */}
+      <div className="bg-slate-900 text-slate-200 text-xs px-3 sm:px-6 py-1.5 flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2 sm:gap-3 overflow-hidden">
+          <div className="flex items-center gap-1.5 font-medium text-slate-300 truncate">
+            <Building2 className="w-3.5 h-3.5 text-blue-400 shrink-0" />
+            <span className="font-semibold text-white truncate">
               {userRole === 'customer'
-                ? 'Patient Verification Portal • Zero Jargon'
+                ? 'Patient Verification Portal'
+                : userRole === 'manufacturer'
+                ? 'Manufacturer Command Hub'
+                : userRole === 'wholesaler'
+                ? 'Wholesaler Depot Hub'
+                : userRole === 'pharmacist'
+                ? 'Licensed Pharmacist Terminal'
                 : userRole === 'chemist'
-                ? 'Chemist Dock Terminal #4 (Delhi Regional)'
+                ? 'Chemist Dock Terminal #4'
                 : userRole === 'regulatory'
-                ? 'CDSCO & State Drug Control Regulatory Vigilance Portal'
-                : 'National Health Supply Command & Verifications'}
+                ? 'CDSCO & State Drug Vigilance'
+                : 'National Health Supply Command'}
             </span>
           </div>
-          <span className="hidden sm:inline text-slate-600">|</span>
-          <div className="hidden sm:flex items-center gap-1.5 text-slate-400">
-            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-            <span>Blockchain Genesis Root: Validated (Block #19,482,044)</span>
-          </div>
+
+          {/* Demo Mode Badge */}
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-purple-900/80 border border-purple-500/50 text-purple-200 text-[10px] font-bold shrink-0">
+            <Sparkles className="w-3 h-3 text-purple-300" />
+            <span>DEMO MODE — Controlled Dataset</span>
+          </span>
         </div>
 
-        <div className="flex items-center gap-4 text-slate-400">
-          <span className="hidden md:inline font-mono text-[11px] text-slate-400">
-            {userRole === 'customer'
-              ? 'AI Consumer Safe-Med Mode'
-              : userRole === 'chemist'
-              ? 'Chemist Stock-Receiving Mode'
-              : userRole === 'regulatory'
-              ? 'Regulatory Intelligence & Case Escalation'
-              : 'Admin Macro Suite'}
-          </span>
+        <div className="flex items-center gap-2 shrink-0">
+          {onSignOut && (
+            <button
+              onClick={onSignOut}
+              className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 font-bold text-[11px] flex items-center gap-1 transition-colors cursor-pointer"
+              title="Switch role or log out"
+            >
+              <LogOut className="w-3 h-3 text-slate-400" />
+              <span className="hidden sm:inline">Switch Role</span>
+            </button>
+          )}
+
+          <button
+            id="btn-reset-demo-header"
+            onClick={handleResetDemo}
+            className="px-2.5 py-1 rounded-lg bg-rose-600/30 hover:bg-rose-600/50 border border-rose-500/40 text-rose-200 font-bold text-[11px] flex items-center gap-1 transition-colors cursor-pointer"
+            title="Reset demo data to baseline state"
+          >
+            <RotateCcw className="w-3 h-3 text-rose-300" />
+            <span className="hidden sm:inline">Reset Demo</span>
+            <span className="sm:hidden">Reset</span>
+          </button>
         </div>
       </div>
 
       {/* Main Nav Bar */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 flex flex-col md:flex-row md:items-center md:justify-between gap-3 sm:gap-4">
-        {/* Left: Brand & Identity & Patient-App Branding */}
-        <div className="flex items-center justify-between shrink-0">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between gap-3">
+        {/* Left: Brand & Mobile Menu Toggle */}
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+            className="md:hidden p-2 rounded-xl text-slate-600 hover:text-slate-900 hover:bg-slate-100 cursor-pointer"
+            aria-label="Toggle menu"
+          >
+            {isMobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+          </button>
+
           <div className="flex items-center gap-3">
             <div
-              className={`w-10 h-10 rounded-xl flex items-center justify-center text-white shadow-sm ring-4 shrink-0 transition-colors ${
+              className={`w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center text-white shadow-sm ring-4 shrink-0 transition-colors ${
                 userRole === 'regulatory'
                   ? 'bg-purple-700 ring-purple-50'
                   : 'bg-blue-700 ring-blue-50'
               }`}
             >
               {userRole === 'regulatory' ? (
-                <ShieldAlert className="w-6 h-6" />
+                <ShieldAlert className="w-5 h-5 sm:w-6 sm:h-6" />
               ) : (
-                <ShieldCheck className="w-6 h-6" />
+                <ShieldCheck className="w-5 h-5 sm:w-6 sm:h-6" />
               )}
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <span className="font-bold text-lg tracking-tight text-slate-900 font-display">
+                <span className="font-bold text-base sm:text-lg tracking-tight text-slate-900 font-display">
                   MediShield AI
                 </span>
                 <span
-                  className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded border ${
+                  className={`text-[9px] sm:text-[10px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full border ${
                     userRole === 'customer'
                       ? 'bg-blue-50 text-blue-700 border-blue-200'
                       : userRole === 'chemist'
@@ -137,125 +179,155 @@ export const Header: React.FC<HeaderProps> = ({
                   }`}
                 >
                   {userRole === 'customer'
-                    ? 'Patient App'
+                    ? 'Patient Workspace'
                     : userRole === 'chemist'
-                    ? 'Chemist Dock'
+                    ? 'Chemist Terminal'
                     : userRole === 'regulatory'
-                    ? 'Gov / Regulatory'
+                    ? 'Gov Regulatory Workspace'
                     : 'Admin Suite'}
                 </span>
               </div>
-              <p className="text-xs text-slate-500">
-                {userRole === 'customer'
-                  ? 'Verify genuine medicine & safety'
-                  : userRole === 'chemist'
-                  ? 'Stock receiving & optical hologram check'
-                  : userRole === 'regulatory'
-                  ? 'Regulatory intelligence, pattern detection & government escalation'
-                  : 'Total checking records & macro graphs'}
-              </p>
             </div>
           </div>
         </div>
 
-        {/* Right: Horizontal Role Switcher & Header Controls in a Compact Row */}
-        <div className="flex flex-wrap items-center justify-between sm:justify-end gap-2.5 sm:gap-3">
-          {/* User-Role Switcher (Horizontal compact row) */}
-          <div
-            id="header-role-switcher"
-            className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl border border-slate-200 overflow-x-auto max-w-full"
-          >
-            <button
-              id="role-btn-customer"
-              onClick={() => setUserRole('customer')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${
-                userRole === 'customer'
-                  ? 'bg-blue-600 text-white shadow-xs'
-                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/70'
-              }`}
-            >
-              <User className="w-3.5 h-3.5" />
-              <span>Patient / Customer</span>
-            </button>
-
-            <button
-              id="role-btn-chemist"
-              onClick={() => setUserRole('chemist')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${
-                userRole === 'chemist'
-                  ? 'bg-emerald-700 text-white shadow-xs'
-                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/70'
-              }`}
-            >
-              <Store className="w-3.5 h-3.5" />
-              <span>Chemist / Stock Receiver</span>
-            </button>
-
-            <button
-              id="role-btn-admin"
-              onClick={() => setUserRole('admin')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${
-                userRole === 'admin'
-                  ? 'bg-slate-900 text-white shadow-xs'
-                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/70'
-              }`}
-            >
-              <Shield className="w-3.5 h-3.5" />
-              <span>Administrator</span>
-            </button>
-
-            <button
-              id="role-btn-regulatory"
-              onClick={() => setUserRole('regulatory')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${
-                userRole === 'regulatory'
-                  ? 'bg-purple-700 text-white shadow-xs ring-1 ring-purple-400'
-                  : 'text-purple-700 hover:text-purple-900 hover:bg-purple-100/70 font-bold'
-              }`}
-            >
-              <ShieldAlert className="w-3.5 h-3.5" />
-              <span>Regulatory Authority</span>
-            </button>
-          </div>
-
-          {/* Quick Camera Scan / Actions */}
+        {/* Right Desktop Actions */}
+        <div className="hidden md:flex items-center gap-3">
           {(userRole === 'customer' || userRole === 'chemist') && (
             <button
               id="header-btn-camera"
               onClick={onOpenQuickCamera}
-              className="px-3.5 py-1.5 rounded-xl bg-blue-700 hover:bg-blue-800 text-white text-xs font-bold flex items-center gap-1.5 shadow-sm transition-all active:scale-95 cursor-pointer shrink-0"
+              className="px-3.5 py-1.5 rounded-xl bg-blue-700 hover:bg-blue-800 text-white text-xs font-bold flex items-center gap-1.5 shadow-sm transition-all cursor-pointer shrink-0"
             >
               <Camera className="w-3.5 h-3.5" />
               <span>Open Scanner</span>
             </button>
           )}
 
-          {(userRole === 'admin' || userRole === 'regulatory') && (
-            <div className="flex items-center gap-2 shrink-0">
-              {hasActiveFilters && (
-                <button
-                  id="btn-clear-global-filters"
-                  onClick={onClearFilters}
-                  className="px-2.5 py-1.5 text-xs font-medium text-amber-700 bg-amber-50 hover:bg-amber-100 border border-amber-200 rounded-lg flex items-center gap-1 transition-colors cursor-pointer"
-                  title="Clear active filters"
-                >
-                  <X className="w-3.5 h-3.5" />
-                  <span>Clear filters</span>
-                </button>
-              )}
-
-              <button
-                id="btn-export-pdf"
-                onClick={onExportPDF}
-                className="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white text-xs font-medium rounded-lg shadow-xs flex items-center gap-1.5 transition-colors cursor-pointer"
-              >
-                <Printer className="w-3.5 h-3.5" />
-                <span>Export Dossier</span>
-              </button>
-            </div>
+          {onSignOut && (
+            <button
+              onClick={onSignOut}
+              className="px-3.5 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 border border-slate-300 text-slate-700 text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer shrink-0"
+            >
+              <LogOut className="w-3.5 h-3.5 text-slate-500" />
+              <span>Switch Role</span>
+            </button>
           )}
         </div>
       </div>
+
+      {/* Mobile Drawer Navigation Menu */}
+      {isMobileMenuOpen && (
+        <div className="md:hidden bg-slate-900 text-white px-4 py-4 border-t border-slate-800 space-y-4 animate-in slide-in-from-top duration-200">
+          {/* Active Account Identity */}
+          <div className="p-3 bg-slate-800/80 rounded-xl border border-slate-700 flex items-center justify-between">
+            <div>
+              <div className="text-[10px] text-slate-400 uppercase font-bold">Active Role Session</div>
+              <div className="text-xs font-bold text-white capitalize">{userRole} Workspace</div>
+            </div>
+            {onSignOut && (
+              <button
+                onClick={() => {
+                  setIsMobileMenuOpen(false);
+                  onSignOut();
+                }}
+                className="px-2.5 py-1 bg-blue-600 text-white text-xs font-bold rounded-lg flex items-center gap-1"
+              >
+                <LogOut className="w-3 h-3" />
+                <span>Switch</span>
+              </button>
+            )}
+          </div>
+
+          {/* Quick Scanner Action on Mobile */}
+          {(userRole === 'customer' || userRole === 'chemist') && (
+            <button
+              onClick={() => {
+                onOpenQuickCamera();
+                setIsMobileMenuOpen(false);
+              }}
+              className="w-full py-3 bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs rounded-xl flex items-center justify-center gap-2 cursor-pointer"
+            >
+              <Camera className="w-4 h-4" />
+              <span>Launch Camera Scanner</span>
+            </button>
+          )}
+
+          <button
+            onClick={handleResetDemo}
+            className="w-full py-2.5 bg-rose-950/80 hover:bg-rose-900 border border-rose-500/50 text-rose-200 font-bold text-xs rounded-xl flex items-center justify-center gap-2 cursor-pointer"
+          >
+            <RotateCcw className="w-4 h-4" />
+            <span>Reset Demo Data</span>
+          </button>
+        </div>
+      )}
+
+      {/* Chemist Secondary Sub-Tabs (Only visible in Chemist mode) */}
+      {userRole === 'chemist' && (
+        <div className="bg-emerald-950/10 border-t border-emerald-200 px-4 sm:px-6 py-2">
+          <div className="max-w-7xl mx-auto flex items-center gap-1 overflow-x-auto">
+            <button
+              id="nav-tab-chemist-dashboard"
+              onClick={() => setActiveTab('dashboard')}
+              className={`px-3 py-1 rounded-md text-xs font-bold transition-all flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${
+                activeTab === 'dashboard'
+                  ? 'bg-emerald-700 text-white shadow-xs'
+                  : 'text-emerald-900 hover:bg-emerald-100/80'
+              }`}
+            >
+              <Store className="w-3.5 h-3.5" />
+              <span>Chemist Dock & Verification Terminal</span>
+            </button>
+
+            <button
+              id="nav-tab-chemist-blockchain"
+              onClick={() => setActiveTab('blockchain')}
+              className={`px-3 py-1 rounded-md text-xs font-bold transition-all flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${
+                activeTab === 'blockchain'
+                  ? 'bg-emerald-700 text-white shadow-xs'
+                  : 'text-emerald-900 hover:bg-emerald-100/80'
+              }`}
+            >
+              <Link2 className="w-3.5 h-3.5" />
+              <span>Blockchain Ledger Proofs</span>
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Patient / Customer Secondary Sub-Tabs (Only visible in Patient mode) */}
+      {userRole === 'customer' && (
+        <div className="bg-blue-950/10 border-t border-blue-200 px-4 sm:px-6 py-2">
+          <div className="max-w-7xl mx-auto flex items-center gap-1 overflow-x-auto">
+            <button
+              id="nav-tab-patient-dashboard"
+              onClick={() => setActiveTab('dashboard')}
+              className={`px-3 py-1 rounded-md text-xs font-bold transition-all flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${
+                activeTab === 'dashboard'
+                  ? 'bg-blue-700 text-white shadow-xs'
+                  : 'text-blue-900 hover:bg-blue-100/80'
+              }`}
+            >
+              <User className="w-3.5 h-3.5" />
+              <span>Verify Your Medicine</span>
+            </button>
+
+            <button
+              id="nav-tab-patient-blockchain"
+              onClick={() => setActiveTab('blockchain')}
+              className={`px-3 py-1 rounded-md text-xs font-bold transition-all flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${
+                activeTab === 'blockchain'
+                  ? 'bg-blue-700 text-white shadow-xs'
+                  : 'text-blue-900 hover:bg-blue-100/80'
+              }`}
+            >
+              <ShieldCheck className="w-3.5 h-3.5" />
+              <span>Safety & Blockchain Certificate</span>
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Regulatory Secondary Sub-Tabs (Only visible in Regulatory mode) */}
       {userRole === 'regulatory' && (
@@ -305,6 +377,19 @@ export const Header: React.FC<HeaderProps> = ({
             </button>
 
             <button
+              id="nav-tab-blockchain-reg"
+              onClick={() => setActiveTab('blockchain')}
+              className={`px-3 py-1 rounded-md text-xs font-bold transition-all flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${
+                activeTab === 'blockchain'
+                  ? 'bg-purple-700 text-white shadow-xs'
+                  : 'text-purple-900 hover:bg-purple-100/80'
+              }`}
+            >
+              <Link2 className="w-3.5 h-3.5" />
+              <span>Blockchain Traceability</span>
+            </button>
+
+            <button
               id="nav-tab-audit-reg"
               onClick={() => setActiveTab('audit')}
               className={`px-3 py-1 rounded-md text-xs font-bold transition-all flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${
@@ -335,6 +420,19 @@ export const Header: React.FC<HeaderProps> = ({
             >
               <Activity className="w-3.5 h-3.5" />
               <span>All Checking Records & Summary</span>
+            </button>
+
+            <button
+              id="nav-tab-blockchain-admin"
+              onClick={() => setActiveTab('blockchain')}
+              className={`px-3 py-1 rounded-md text-xs font-semibold transition-all flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${
+                activeTab === 'blockchain'
+                  ? 'bg-white text-blue-700 shadow-xs border border-blue-200 ring-1 ring-blue-300/40'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <Link2 className="w-3.5 h-3.5 text-blue-600" />
+              <span>Blockchain Traceability</span>
             </button>
 
             <button

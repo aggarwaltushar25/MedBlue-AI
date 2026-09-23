@@ -43,6 +43,27 @@ export interface ShipmentVerification {
   rfidTag?: string;
   gs1DataMatrix?: string;
   riskProfile?: ShipmentRiskProfile;
+  verificationStatus?: string;
+  originLocation?: string;
+  dispatchDate?: string;
+  estimatedArrival?: string;
+  overallRisk?: string;
+  isFlagged?: boolean;
+  coldChainCompliant?: boolean;
+  serialCheckPassed?: boolean;
+  packagingScore?: number;
+  scannedSerialCount?: number;
+  verifiedSerialCount?: number;
+  referenceHologramUrl?: string;
+  batchImageUrl?: string;
+  hologramStatus?: 'Reference Available' | 'Reference Missing';
+  lastHologramCheckResult?: 'PASS' | 'FLAGGED' | 'UNABLE_TO_VERIFY';
+  destinationLocation?: string;
+  currentLocation?: string;
+  parentShipmentId?: string;
+  quantity?: number;
+  blockchainTxHash?: string;
+  auditLogs?: Array<{ timestamp: string; action: string; actor: string; role?: string }>;
 }
 
 export interface ExecutiveKPIs {
@@ -128,6 +149,7 @@ export interface ActivityEvent {
   description: string;
   shipmentId: string;
   supplier: string;
+  role?: string;
 }
 
 export interface SupplierPerformance {
@@ -199,7 +221,14 @@ export interface FilterState {
   searchQuery: string;
 }
 
-export type UserRole = 'customer' | 'chemist' | 'admin' | 'regulatory';
+export type UserRole =
+  | 'customer'
+  | 'chemist'
+  | 'pharmacist'
+  | 'wholesaler'
+  | 'manufacturer'
+  | 'admin'
+  | 'regulatory';
 
 export type IncidentSeverity = 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW';
 
@@ -390,6 +419,71 @@ export interface StoreRegulatoryRisk {
   riskTrend: 'increasing' | 'stable' | 'decreasing';
   lastIncident: string;
   reviewStatus: 'Compliant' | 'Requires Review' | 'Investigation Active' | 'Escalated';
+}
+
+export interface HologramReference {
+  id: string;
+  medicineId: string;
+  medicineName: string;
+  genericName?: string;
+  batchId: string;
+  batchNumber: string;
+  manufacturerId: string;
+  manufacturerName: string;
+  referenceImageUrl: string;
+  batchImageUrl?: string;
+  timestamp: string;
+  location: string;
+  status: 'Reference Available' | 'Reference Missing';
+  blockchainTxHash?: string;
+  notes?: string;
+}
+
+export interface HologramCheck {
+  id: string;
+  medicineId: string;
+  medicineName: string;
+  batchId: string;
+  batchNumber: string;
+  shipmentId: string;
+  actor: string;
+  actorRole: 'Manufacturer' | 'Wholesaler' | 'Pharmacist' | 'Chemist' | 'Patient' | 'Regulator' | 'Admin';
+  organization: string;
+  timestamp: string;
+  location: string;
+  result: 'PASS' | 'FLAGGED' | 'UNABLE_TO_VERIFY';
+  resultLabel: string;
+  capturedImageUrl?: string;
+  referenceImageUrl?: string;
+  evidenceReference?: string;
+  notes?: string;
+  blockchainTxHash?: string;
+  riskScore?: number;
+}
+
+export interface HologramStats {
+  totalChecks: number;
+  passedCount: number;
+  flaggedCount: number;
+  unableToVerifyCount: number;
+  checksByRole: Record<string, number>;
+  checksBySupplier: Record<string, number>;
+  checksByCategory: Record<string, number>;
+  recentIncidents: Array<{
+    id: string;
+    batchNumber: string;
+    medicineName: string;
+    supplier: string;
+    timestamp: string;
+    result: string;
+  }>;
+  repeatedFailures: Array<{
+    batchNumber: string;
+    medicineName: string;
+    supplier: string;
+    failureCount: number;
+    lastChecked: string;
+  }>;
 }
 
 export interface HologramAnalysisResult {

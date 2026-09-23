@@ -47,6 +47,10 @@ import {
   STORE_REGULATORY_RISKS,
   RECURRING_PATTERNS_DETECTED,
 } from '../data/regulatoryData';
+import { RegulatorRiskMap } from './RegulatorRiskMap';
+import { GoogleMapsProvider } from './GoogleMapsProvider';
+import { SupplyChainTraceability } from './SupplyChainTraceability';
+import { unifiedStore } from '../services/unifiedStore';
 
 interface RegulatoryIntelligenceDashboardProps {
   incidents: RegulatoryIncident[];
@@ -127,7 +131,7 @@ export const RegulatoryIntelligenceDashboard: React.FC<RegulatoryIntelligenceDas
       </div>
 
       {/* TOP 6 KPI CARDS (Calculated from real underlying dataset) */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
         {/* KPI 1: Active investigations */}
         <div
           id="kpi-active-investigations"
@@ -426,106 +430,18 @@ export const RegulatoryIntelligenceDashboard: React.FC<RegulatoryIntelligenceDas
         </div>
       </div>
 
-      {/* SECTION 4B: GEOGRAPHIC RISK MAP & CORRIDOR INTELLIGENCE */}
-      <div className="bg-slate-900 border border-slate-800 p-5 rounded-2xl space-y-4 shadow-md">
-        <div className="flex items-center justify-between flex-wrap gap-2">
-          <div>
-            <div className="flex items-center gap-2">
-              <MapPin className="w-4 h-4 text-rose-400" />
-              <h2 className="text-sm font-bold uppercase tracking-wider text-white">
-                Geographic Risk Corridors & Regional Depots
-              </h2>
-            </div>
-            <p className="text-xs text-slate-400 mt-0.5">
-              Regional distribution hubs mapped by verification anomalies, affected retail points, and 30-day incident velocity.
-            </p>
-          </div>
-          {selectedGeoLocation && (
-            <button
-              onClick={() => setSelectedGeoLocation(null)}
-              className="text-xs text-purple-400 underline font-semibold cursor-pointer"
-            >
-              Clear filter ({selectedGeoLocation})
-            </button>
-          )}
-        </div>
+      {/* SECTION 4B: GEOGRAPHIC RISK MAP & CORRIDOR INTELLIGENCE (Interactive Google Map) */}
+      <GoogleMapsProvider>
+        <RegulatorRiskMap
+          incidents={incidents}
+          onOpenIncidentDetail={onOpenIncidentDetail}
+          onOpenEntityProfile={onOpenEntityProfile}
+          onNavigateToIncidents={onNavigateToIncidents}
+        />
+      </GoogleMapsProvider>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
-          {GEOGRAPHIC_REGULATORY_RISKS.map((geo) => (
-            <div
-              key={geo.location}
-              onClick={() => setSelectedGeoLocation(geo.location === selectedGeoLocation ? null : geo.location)}
-              className={`p-3.5 rounded-xl border transition-all cursor-pointer ${
-                selectedGeoLocation === geo.location
-                  ? 'bg-purple-950/50 border-purple-500 ring-2 ring-purple-500/30'
-                  : 'bg-slate-950 border-slate-800 hover:border-slate-700'
-              }`}
-            >
-              <div className="flex items-center justify-between text-xs mb-2">
-                <span className="font-bold text-white truncate">{geo.location}</span>
-                <span
-                  className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${
-                    geo.riskRating === 'High'
-                      ? 'bg-rose-500/20 text-rose-300'
-                      : geo.riskRating === 'Medium'
-                      ? 'bg-amber-500/20 text-amber-300'
-                      : 'bg-emerald-500/20 text-emerald-300'
-                  }`}
-                >
-                  {geo.riskRating}
-                </span>
-              </div>
-
-              <div className="space-y-1.5 text-xs">
-                <div className="flex items-center justify-between text-slate-400">
-                  <span>Incidents:</span>
-                  <span className="font-mono font-bold text-white">{geo.totalIncidents}</span>
-                </div>
-                <div className="flex items-center justify-between text-slate-400">
-                  <span>Avg Risk:</span>
-                  <span className="font-mono font-bold text-amber-400">{geo.averageRiskScore}</span>
-                </div>
-                <div className="flex items-center justify-between text-slate-400">
-                  <span>Growth:</span>
-                  <span className="font-mono font-bold text-rose-400">{geo.incidentGrowth}</span>
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-
-        {/* Drilldown view if location clicked */}
-        {selectedGeoLocation && locationDrilldownIncidents.length > 0 && (
-          <div className="p-4 rounded-xl bg-slate-950 border border-purple-500/40 space-y-3">
-            <div className="flex items-center justify-between">
-              <h3 className="text-xs font-bold uppercase tracking-wider text-purple-300">
-                Incidents in {selectedGeoLocation} ({locationDrilldownIncidents.length})
-              </h3>
-              <button
-                onClick={() => onNavigateToIncidents('ALL', 'ALL')}
-                className="text-xs text-purple-400 hover:underline font-semibold"
-              >
-                View in Registry →
-              </button>
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
-              {locationDrilldownIncidents.map((inc) => (
-                <div
-                  key={inc.id}
-                  onClick={() => onOpenIncidentDetail(inc.id)}
-                  className="p-2.5 rounded-lg bg-slate-900 border border-slate-800 hover:border-slate-700 cursor-pointer flex items-center justify-between"
-                >
-                  <div>
-                    <div className="font-mono font-bold text-purple-300">{inc.id}</div>
-                    <div className="text-white font-medium truncate max-w-xs">{inc.title}</div>
-                  </div>
-                  <span className="font-mono font-bold text-rose-400">{inc.riskScore}/100</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-      </div>
+      {/* SECTION 4B.5: END-TO-END SUPPLY CHAIN TRACEABILITY & BROKEN CHAIN ANOMALY INSPECTOR */}
+      <SupplyChainTraceability />
 
       {/* SECTION 4C & 4D: SUPPLIER & STORE RISK INTELLIGENCE MATRICES */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -659,6 +575,112 @@ export const RegulatoryIntelligenceDashboard: React.FC<RegulatoryIntelligenceDas
           </div>
         </div>
       </div>
+
+      {/* 5: HOLOGRAM VERIFICATION INTELLIGENCE & REPEATED FAILURE OVERSIGHT */}
+      {(() => {
+        const holoStats = unifiedStore.getHologramStats();
+
+        return (
+          <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl space-y-5 shadow-md">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800 pb-4">
+              <div>
+                <div className="flex items-center gap-2">
+                  <ShieldCheck className="w-5 h-5 text-blue-400" />
+                  <h2 className="text-base font-bold uppercase tracking-wider text-white">
+                    Hologram Verification Intelligence & Regulatory Oversight
+                  </h2>
+                </div>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  Analytical telemetry on physical optical security hologram checks, failure rates, and suspicious supplier trends.
+                </p>
+              </div>
+
+              <span className="text-xs font-mono font-bold text-blue-400 bg-blue-950 px-3 py-1 rounded-lg border border-blue-500/30">
+                {holoStats.totalChecks} Total Hologram Inspections
+              </span>
+            </div>
+
+            {/* KPI Cards */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
+              <div className="p-3.5 bg-slate-950 rounded-xl border border-slate-800">
+                <span className="text-[10px] text-slate-400 font-bold uppercase block">Checks Passed</span>
+                <div className="text-2xl font-black font-mono text-emerald-400 mt-1">{holoStats.passedCount}</div>
+                <span className="text-[10px] text-emerald-400 font-medium">Authentic Hologram Pattern</span>
+              </div>
+
+              <div className="p-3.5 bg-slate-950 rounded-xl border border-slate-800">
+                <span className="text-[10px] text-slate-400 font-bold uppercase block">Anomalies Flagged</span>
+                <div className="text-2xl font-black font-mono text-rose-400 mt-1">{holoStats.flaggedCount}</div>
+                <span className="text-[10px] text-rose-400 font-medium">Reflectance Mismatch / Counterfeit</span>
+              </div>
+
+              <div className="p-3.5 bg-slate-950 rounded-xl border border-slate-800">
+                <span className="text-[10px] text-slate-400 font-bold uppercase block">Unable to Verify</span>
+                <div className="text-2xl font-black font-mono text-amber-400 mt-1">{holoStats.unableToVerifyCount}</div>
+                <span className="text-[10px] text-amber-400 font-medium">Missing Sample / Poor Image</span>
+              </div>
+
+              <div className="p-3.5 bg-slate-950 rounded-xl border border-slate-800">
+                <span className="text-[10px] text-slate-400 font-bold uppercase block">Repeated Failure Batches</span>
+                <div className="text-2xl font-black font-mono text-purple-400 mt-1">{holoStats.repeatedFailures.length}</div>
+                <span className="text-[10px] text-purple-400 font-medium">Targeted Regulatory Audit</span>
+              </div>
+            </div>
+
+            {/* Repeated Failures & Recent Hologram Incidents Table */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 text-xs">
+              {/* Repeated Failures */}
+              <div className="p-4 bg-slate-950 rounded-xl border border-slate-800 space-y-3">
+                <span className="font-bold text-slate-200 uppercase text-[11px] flex items-center gap-1.5">
+                  <AlertTriangle className="w-4 h-4 text-rose-400" />
+                  <span>Batches with Repeated Hologram Anomalies</span>
+                </span>
+
+                {holoStats.repeatedFailures.length === 0 ? (
+                  <p className="text-slate-500 italic text-[11px]">No repeated hologram failure patterns detected across active batches.</p>
+                ) : (
+                  <div className="space-y-2">
+                    {holoStats.repeatedFailures.map((rf) => (
+                      <div key={rf.batchNumber} className="p-3 rounded-lg bg-slate-900 border border-slate-800 flex items-center justify-between">
+                        <div>
+                          <div className="font-bold text-white font-mono">{rf.batchNumber}</div>
+                          <div className="text-[11px] text-slate-400">{rf.medicineName} • {rf.supplier}</div>
+                        </div>
+                        <div className="text-right">
+                          <span className="font-mono font-bold text-rose-400 text-xs">{rf.failureCount} Flagged Checks</span>
+                          <div className="text-[10px] text-slate-500">{rf.lastChecked}</div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Recent Incidents Log */}
+              <div className="p-4 bg-slate-950 rounded-xl border border-slate-800 space-y-3">
+                <span className="font-bold text-slate-200 uppercase text-[11px] flex items-center gap-1.5">
+                  <Activity className="w-4 h-4 text-blue-400" />
+                  <span>Recent Hologram Verification Logs</span>
+                </span>
+
+                <div className="space-y-2">
+                  {holoStats.recentIncidents.map((inc) => (
+                    <div key={inc.id} className="p-2.5 rounded-lg bg-slate-900 border border-slate-800 flex items-center justify-between">
+                      <div>
+                        <div className="font-medium text-white">{inc.medicineName} ({inc.batchNumber})</div>
+                        <div className="text-[10px] text-slate-400">{inc.supplier} • {inc.timestamp}</div>
+                      </div>
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-rose-500/20 text-rose-300 border border-rose-500/30">
+                        {inc.result}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 };

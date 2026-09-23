@@ -59,13 +59,13 @@ export const AlertsView: React.FC<AlertsViewProps> = ({
               }`}
             >
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-2">
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
                   {isCritical ? (
-                    <span className="p-1 rounded bg-rose-50 text-rose-600">
+                    <span className="p-1 rounded bg-rose-50 text-rose-600 shrink-0">
                       <ShieldAlert className="w-5 h-5" />
                     </span>
                   ) : (
-                    <span className="p-1 rounded bg-amber-50 text-amber-600">
+                    <span className="p-1 rounded bg-amber-50 text-amber-600 shrink-0">
                       <AlertTriangle className="w-5 h-5" />
                     </span>
                   )}
@@ -87,12 +87,12 @@ export const AlertsView: React.FC<AlertsViewProps> = ({
                 </div>
               </div>
 
-              <p className="text-xs text-slate-600 leading-relaxed mb-4 pl-8">
+              <p className="text-xs text-slate-600 leading-relaxed mb-4 sm:pl-8">
                 {alert.description}
               </p>
 
-              <div className="flex items-center justify-between pl-8 pt-2 border-t border-slate-100">
-                <div className="flex items-center gap-2">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between sm:pl-8 pt-2 border-t border-slate-100 gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
                   <span className="text-xs font-mono text-slate-500 bg-slate-100 px-2 py-0.5 rounded">
                     Shipment: {alert.shipmentId}
                   </span>
@@ -105,7 +105,7 @@ export const AlertsView: React.FC<AlertsViewProps> = ({
 
                 <button
                   onClick={() => onReviewAlert(alert)}
-                  className="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-md shadow-xs transition-colors flex items-center gap-1.5 cursor-pointer"
+                  className="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-md shadow-xs transition-colors flex items-center gap-1.5 cursor-pointer shrink-0"
                 >
                   <span>Investigate shipment</span>
                   <ArrowRight className="w-3.5 h-3.5" />

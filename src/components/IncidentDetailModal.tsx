@@ -43,6 +43,7 @@ interface IncidentDetailModalProps {
   onOpenEntityProfile?: (entityId: string, entityType: 'store' | 'supplier' | 'manufacturer') => void;
   onOpenRelatedIncident?: (incidentId: string) => void;
   onOpenForensics?: (batchNumber: string) => void;
+  onViewBlockchainHistory?: (shipmentId: string) => void;
 }
 
 export const IncidentDetailModal: React.FC<IncidentDetailModalProps> = ({
@@ -53,6 +54,7 @@ export const IncidentDetailModal: React.FC<IncidentDetailModalProps> = ({
   onOpenEntityProfile,
   onOpenRelatedIncident,
   onOpenForensics,
+  onViewBlockchainHistory,
 }) => {
   const [activeTab, setActiveTab] = useState<'evidence' | 'timeline' | 'entities' | 'regulatory_action'>('evidence');
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
@@ -394,6 +396,67 @@ export const IncidentDetailModal: React.FC<IncidentDetailModalProps> = ({
                 )}
               </div>
 
+              {/* Section 10 & 11: Blockchain Evidence & Evidence Integrity */}
+              <div className="p-4 rounded-xl bg-gradient-to-br from-purple-950/40 via-slate-950 to-slate-900 border border-purple-500/40 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <ShieldCheck className="w-4 h-4 text-emerald-400" />
+                    <h4 className="text-xs font-bold uppercase tracking-wider text-purple-200">
+                      Blockchain Evidence & Cryptographic Integrity
+                    </h4>
+                  </div>
+                  <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-950 text-emerald-300 border border-emerald-800 flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                    Evidence Integrity Verified
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 text-xs font-mono bg-slate-900/90 p-3 rounded-lg border border-slate-800">
+                  <div>
+                    <span className="text-slate-400 text-[10px] block font-sans">Evidence Records:</span>
+                    <strong className="text-white text-sm">14 Records</strong>
+                  </div>
+                  <div>
+                    <span className="text-slate-400 text-[10px] block font-sans">First Block Event:</span>
+                    <span className="text-slate-300 text-[11px] truncate block">15 Sep 2026 08:30</span>
+                  </div>
+                  <div>
+                    <span className="text-slate-400 text-[10px] block font-sans">Latest Block Event:</span>
+                    <span className="text-slate-300 text-[11px] truncate block">18 Sep 2026 10:15</span>
+                  </div>
+                  <div>
+                    <span className="text-slate-400 text-[10px] block font-sans">Chain Status:</span>
+                    <span className="text-emerald-400 font-bold text-[11px] truncate block">✓ Verified Linked</span>
+                  </div>
+                </div>
+
+                <div className="p-3 bg-slate-950 rounded-lg border border-slate-800/80 space-y-1 text-[11px] font-mono">
+                  <div className="flex justify-between text-slate-400">
+                    <span>Evidence Package Anchored SHA-256:</span>
+                    <span className="text-emerald-400 font-bold">9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08</span>
+                  </div>
+                  <div className="text-[10px] text-slate-400 font-sans pt-1">
+                    The blockchain proves that the recorded evidence package has not been altered after anchoring.
+                  </div>
+                </div>
+
+                {onViewBlockchainHistory && (
+                  <div className="pt-1 flex justify-end">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        onViewBlockchainHistory(incident.shipmentId || 'SHP-001');
+                        onClose();
+                      }}
+                      className="px-3 py-1.5 bg-purple-700 hover:bg-purple-600 text-white rounded-lg text-xs font-bold transition-colors flex items-center gap-1.5 cursor-pointer shadow-xs"
+                    >
+                      <span>View Complete Blockchain History</span>
+                      <ExternalLink className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                )}
+              </div>
+
               {/* Related Incidents */}
               {incident.relatedIncidents && incident.relatedIncidents.length > 0 && (
                 <div className="p-3.5 rounded-xl bg-slate-950 border border-slate-800 space-y-2 text-xs">
@@ -647,7 +710,7 @@ export const IncidentDetailModal: React.FC<IncidentDetailModalProps> = ({
                 </div>
 
                 <form onSubmit={handleStatusSubmit} className="space-y-3">
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
                     {(['NEW', 'UNDER REVIEW', 'INVESTIGATION', 'ESCALATED', 'ACTION TAKEN', 'CLOSED'] as IncidentStatus[]).map(
                       (st) => (
                         <button

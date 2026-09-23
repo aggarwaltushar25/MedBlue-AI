@@ -500,7 +500,7 @@ export const IncidentManagementView: React.FC<IncidentManagementViewProps> = ({
                 <label className="text-[10px] uppercase font-bold text-slate-400 block mb-1">
                   Select New Disposition Status
                 </label>
-                <div className="grid grid-cols-2 gap-2">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                   {(['NEW', 'UNDER REVIEW', 'INVESTIGATION', 'ESCALATED', 'ACTION TAKEN', 'CLOSED'] as IncidentStatus[]).map(
                     (st) => (
                       <button

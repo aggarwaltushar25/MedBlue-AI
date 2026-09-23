@@ -399,7 +399,7 @@ export const AnalyticsPage: React.FC<AnalyticsPageProps> = ({
             </div>
 
             {/* Summary stats */}
-            <div className="mt-4 pt-3 border-t border-slate-100 grid grid-cols-3 gap-2 text-center text-xs">
+            <div className="mt-4 pt-3 border-t border-slate-100 grid grid-cols-1 sm:grid-cols-3 gap-2 text-center text-xs">
               <div className="p-2 rounded bg-slate-50">
                 <span className="text-slate-500 block text-[11px]">Avg. Daily Verifications</span>
                 <span className="text-slate-900 font-bold text-sm">18 batches</span>
