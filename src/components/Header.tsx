@@ -46,6 +46,8 @@ interface HeaderProps {
   setActiveTab: (tab: AppNavTab) => void;
   userRole: UserRole;
   onOpenQuickCamera: () => void;
+  onOpenImageUploadModal?: () => void;
+  onOpenEvaluatorSuite?: () => void;
   filters: FilterState;
   onClearFilters: () => void;
   onExportPDF: () => void;
@@ -59,6 +61,8 @@ export const Header: React.FC<HeaderProps> = ({
   setActiveTab,
   userRole,
   onOpenQuickCamera,
+  onOpenImageUploadModal,
+  onOpenEvaluatorSuite,
   filters,
   onClearFilters,
   onExportPDF,
@@ -127,6 +131,17 @@ export const Header: React.FC<HeaderProps> = ({
         </div>
 
         <div className="flex items-center gap-2 shrink-0">
+          {onOpenEvaluatorSuite && (
+            <button
+              onClick={onOpenEvaluatorSuite}
+              className="px-2.5 py-1 rounded-lg bg-purple-600/40 hover:bg-purple-600/60 border border-purple-400/50 text-purple-200 font-bold text-[11px] flex items-center gap-1.5 transition-colors cursor-pointer"
+              title="Open Evaluator Test Suite"
+            >
+              <Sparkles className="w-3.5 h-3.5 text-purple-300" />
+              <span className="hidden sm:inline">Evaluator Suite</span>
+            </button>
+          )}
+
           {onSignOut && (
             <button
               onClick={onSignOut}
@@ -208,6 +223,16 @@ export const Header: React.FC<HeaderProps> = ({
 
         {/* Right Desktop Actions */}
         <div className="hidden md:flex items-center gap-3">
+          {onOpenImageUploadModal && (
+            <button
+              onClick={onOpenImageUploadModal}
+              className="px-3 py-1.5 rounded-xl bg-purple-50 hover:bg-purple-100 border border-purple-200 text-purple-800 text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer shrink-0"
+              title="Upload Medicine Box Photo or Hologram for AI Analysis"
+            >
+              <Camera className="w-3.5 h-3.5 text-purple-600" />
+              <span>Hologram AI Scan</span>
+            </button>
+          )}
           <button
             onClick={() => setActiveTab('notifications')}
             className={`px-3.5 py-1.5 rounded-xl text-xs font-bold flex items-center gap-2 border transition-all cursor-pointer relative shrink-0 ${

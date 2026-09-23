@@ -35,6 +35,8 @@ import { ManufacturerDashboard } from './components/ManufacturerDashboard';
 import { WholesalerDashboard } from './components/WholesalerDashboard';
 import { PharmacistDashboard } from './components/PharmacistDashboard';
 import { NotificationsView } from './components/NotificationsView';
+import { EvaluatorTestCasesModal } from './components/EvaluatorTestCasesModal';
+import { MedicineImageUploadModal } from './components/MedicineImageUploadModal';
 import { unifiedStore } from './services/unifiedStore';
 
 import { api } from './services/api';
@@ -112,6 +114,8 @@ export default function App() {
 
   // Quick Camera Scanner State (opened from header)
   const [quickCameraOpen, setQuickCameraOpen] = useState<boolean>(false);
+  const [evaluatorModalOpen, setEvaluatorModalOpen] = useState<boolean>(false);
+  const [imageUploadModalOpen, setImageUploadModalOpen] = useState<boolean>(false);
 
   // Regulatory State
   const [incidents, setIncidents] = useState<RegulatoryIncident[]>(INITIAL_REGULATORY_INCIDENTS);
@@ -624,6 +628,8 @@ export default function App() {
         setActiveTab={handleTabChange}
         userRole={userRole}
         onOpenQuickCamera={() => setQuickCameraOpen(true)}
+        onOpenImageUploadModal={() => setImageUploadModalOpen(true)}
+        onOpenEvaluatorSuite={() => setEvaluatorModalOpen(true)}
         filters={filters}
         onClearFilters={handleClearAllFilters}
         onExportPDF={() => window.print()}
@@ -905,6 +911,26 @@ export default function App() {
         isOpen={quickCameraOpen}
         onClose={() => setQuickCameraOpen(false)}
         mode={userRole === 'patient' ? 'patient' : 'chemist'}
+        onViewForensics={handleOpenBatchForensics}
+      />
+
+      {/* Evaluator Test Cases Modal */}
+      <EvaluatorTestCasesModal
+        isOpen={evaluatorModalOpen}
+        onClose={() => setEvaluatorModalOpen(false)}
+        onOpenScanner={() => setQuickCameraOpen(true)}
+        onOpenBlockchain={() => handleOpenBlockchainView()}
+        onOpenRegulatory={() => {
+          setUserRole('regulatory');
+          setActiveTab('regulatory');
+        }}
+        onOpenForensics={handleOpenBatchForensics}
+      />
+
+      {/* Medicine Image & Optical Hologram AI Upload Modal */}
+      <MedicineImageUploadModal
+        isOpen={imageUploadModalOpen}
+        onClose={() => setImageUploadModalOpen(false)}
         onViewForensics={handleOpenBatchForensics}
       />
 

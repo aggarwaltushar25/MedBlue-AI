@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   Camera,
   Upload,
@@ -168,8 +168,98 @@ export const ChemistModeView: React.FC<ChemistModeViewProps> = ({
     setActiveTab('inventory');
   };
 
+  const filteredInventory = useMemo(() => {
+    return inventoryList.filter((item) => {
+      const matchesSearch =
+        item.medicineName.toLowerCase().includes(inventorySearch.toLowerCase()) ||
+        item.batchNumber.toLowerCase().includes(inventorySearch.toLowerCase()) ||
+        item.serialNumber.toLowerCase().includes(inventorySearch.toLowerCase()) ||
+        item.supplier.toLowerCase().includes(inventorySearch.toLowerCase());
+      if (!matchesSearch) return false;
+      if (inventoryFilter === 'ALL') return true;
+      if (inventoryFilter === 'VERIFIED') return item.verificationStatus === 'Verified';
+      if (inventoryFilter === 'QUARANTINED') return item.verificationStatus === 'Quarantined';
+      if (inventoryFilter === 'HOLD') return item.verificationStatus === 'Hold' || item.verificationStatus === 'Requires Review';
+      if (inventoryFilter === 'EXPIRED') return item.verificationStatus === 'Expired';
+      if (inventoryFilter === 'HIGH_RISK') return item.riskScore >= 60;
+      return true;
+    });
+  }, [inventoryList, inventorySearch, inventoryFilter]);
+
+  const quarantinedItems = useMemo(() => {
+    return inventoryList.filter((item) => item.verificationStatus === 'Quarantined');
+  }, [inventoryList]);
+
+  const handleOpenQuarantineModal = (itemDetails: {
+    medicineName: string;
+    batchNumber: string;
+    serialNumber: string;
+    shipmentId: string;
+    currentStatus: string;
+    riskScore: number;
+    reason: string;
+  }) => {
+    setQuarantineModalItem({
+      ...itemDetails,
+      notes: '',
+    });
+  };
+
+  const handleConfirmQuarantine = () => {
+    if (!quarantineModalItem) return;
+    unifiedStore.quarantineMedicine({
+      medicineName: quarantineModalItem.medicineName,
+      batchNumber: quarantineModalItem.batchNumber,
+      serialNumber: quarantineModalItem.serialNumber,
+      shipmentId: quarantineModalItem.shipmentId || 'SHP-001',
+      reason: quarantineModalItem.reason,
+      notes: quarantineModalItem.notes,
+      reviewer: chemistName,
+    });
+    if (onAddActivity) {
+      onAddActivity(`Quarantined batch ${quarantineModalItem.batchNumber}`, 'quarantine');
+    }
+    setActionNotice(`Batch ${quarantineModalItem.batchNumber} successfully placed in Quarantine Locker.`);
+    setQuarantineModalItem(null);
+  };
+
+  const handleConfirmRelease = () => {
+    if (!releaseModalItem) return;
+    unifiedStore.releaseMedicine(
+      releaseModalItem.batchNumber,
+      `${releaseReason} (Auth Code: ${releaseAuthCode})`,
+      releaseReviewer
+    );
+    if (onAddActivity) {
+      onAddActivity(`Released batch ${releaseModalItem.batchNumber}`, 'accept');
+    }
+    setActionNotice(`Batch ${releaseModalItem.batchNumber} authorized and released to active inventory.`);
+    setReleaseModalItem(null);
+  };
+
+  const handleSelectMedicine = (result: ScannedMedicineResult) => {
+    setCurrentMedicine(result);
+    setActionNotice(`Scanned medicine: ${result.medicineName}`);
+  };
+
   return (
     <div className="space-y-6">
+      {/* Action Notice Alert Banner */}
+      {actionNotice && (
+        <div className="p-4 rounded-2xl bg-blue-50 border border-blue-200 text-blue-900 text-xs flex items-center justify-between shadow-xs">
+          <div className="flex items-center gap-2 font-semibold">
+            <CheckCircle2 className="w-4 h-4 text-blue-600 shrink-0" />
+            <span>{actionNotice}</span>
+          </div>
+          <button
+            onClick={() => setActionNotice(null)}
+            className="text-slate-400 hover:text-slate-600 font-bold px-2 py-0.5 rounded-lg cursor-pointer"
+          >
+            ✕
+          </button>
+        </div>
+      )}
+
       {/* Header Banner */}
       <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-7 text-white shadow-md relative overflow-hidden">
         <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">

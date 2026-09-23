@@ -1236,6 +1236,18 @@ class UnifiedStoreService {
     return true;
   }
 
+  public releaseMedicine(batchNumber: string, reason: string, reviewer: string) {
+    const inv = this.inventory.find((i) => i.batchNumber === batchNumber);
+    return this.releaseFromQuarantine({
+      batchNumber,
+      serialNumber: inv?.serialNumber || `GS1-${batchNumber}`,
+      shipmentId: inv?.shipmentId || 'SHP-001',
+      reason,
+      reviewer,
+      authCode: 'AUTH-SUPV-901',
+    });
+  }
+
   // ENTIRE STOCK CONTINUOUS SCANNER SESSION
   public recordStockScanSession(session: StockScanSession) {
     this.scanSessions.unshift(session);

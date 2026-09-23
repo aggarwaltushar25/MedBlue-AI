@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   ShieldCheck,
   X,
@@ -34,7 +34,9 @@ export const BlockchainModal: React.FC<BlockchainModalProps> = ({ medicine, onCl
 
   useEffect(() => {
     const unsub = unifiedStore.subscribe(() => setStoreTick(t => t + 1));
-    return () => unsub();
+    return () => {
+      unsub();
+    };
   }, []);
 
   const ancestryBlocks = useMemo(() => {
@@ -201,7 +203,7 @@ export const BlockchainModal: React.FC<BlockchainModalProps> = ({ medicine, onCl
             </h4>
             <div className="space-y-2">
               {ancestryBlocks.length > 0 ? (
-                ancestryBlocks.map((blk, idx) => (
+                ancestryBlocks.map((blk: BlockchainBlock, idx: number) => (
                   <div
                     key={blk.blockNumber}
                     className="flex items-start gap-3 p-2.5 rounded-lg bg-slate-50 border border-slate-200 text-xs"
